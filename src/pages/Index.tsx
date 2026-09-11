@@ -1,10 +1,10 @@
-import PortfolioDesk from "@/components/PortfolioDesk";
-import "@/styles/portfolio-os.css";
+import { useSearchParams } from "react-router-dom";
+import Desktop from "@/components/desktop/Desktop";
+import "@/styles/desktop.css";
 
-const Index = () => (
-  <main className="portfolio-os-page">
-    <PortfolioDesk />
-  </main>
-);
+const Index = () => {
+  const [params] = useSearchParams();
+  return <Desktop initialApp={params.get("app") ?? undefined} initialCollection={params.get("collection") ?? undefined} />;
+};
 
 export default Index;

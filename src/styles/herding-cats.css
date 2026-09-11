@@ -1,0 +1,53 @@
+.herding-cats {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.herding-cats iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #231f20;
+}
+
+.herding-cats-sleep {
+  width: 100%;
+  height: 100%;
+  background: #231f20;
+}
+
+.game-window .window-inner {
+  overflow: hidden;
+  border: 0;
+  border-radius: 16px;
+  background: #231f20;
+  box-shadow:
+    0 22px 75px #0c1f4752,
+    0 2px 8px #13274830;
+}
+
+.game-window .window-titlebar {
+  display: none;
+}
+
+.game-window .window-content {
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .game-window .window-inner {
+    border-radius: 0;
+  }
+
+  .game-window .window-titlebar {
+    display: grid;
+  }
+
+  .game-window .window-content {
+    flex: 1;
+    min-height: 0;
+  }
+}

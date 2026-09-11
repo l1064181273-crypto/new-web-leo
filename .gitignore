@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local evidence and packaged deliverables
+artifacts/
+playwright-report/
+test-results/
+deliverables/

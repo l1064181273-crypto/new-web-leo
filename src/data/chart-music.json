@@ -1,0 +1,100 @@
+{
+  "chart": {
+    "title": "Billboard Year-End Hot 100 · 2024",
+    "url": "https://www.billboard.com/lists/hot-100-year-end-chart-teddy-swims-taylor-swift-republic/2024-hot-100-songs-top-10/",
+    "published": "2024-12-13",
+    "verified": "2026-09-10"
+  },
+  "tracks": [
+    {
+      "rank": 1,
+      "title": "Lose Control",
+      "artist": "Teddy Swims",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/9f/65/d6/9f65d67d-db40-d7da-c954-9a23d28dfe1a/mzaf_7625794503195542708.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/lose-control/1691699589?i=1691699836&uo=4",
+      "trackId": 1691699836,
+      "explicit": false
+    },
+    {
+      "rank": 2,
+      "title": "A Bar Song (Tipsy)",
+      "artist": "Shaboozey",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/46/6f/7f/466f7f67-0365-ddf8-16c2-e033371d2f7e/mzaf_3764341442720608698.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/a-bar-song-tipsy/1749591710?i=1749591722&uo=4",
+      "trackId": 1749591722,
+      "explicit": false
+    },
+    {
+      "rank": 3,
+      "title": "Beautiful Things",
+      "artist": "Benson Boone",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/4d/d5/00/4dd5006f-ee02-c3f1-94db-0ed4b8dd68f1/mzaf_14250561294796027079.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/beautiful-things/1724488123?i=1724488124&uo=4",
+      "trackId": 1724488124,
+      "explicit": false
+    },
+    {
+      "rank": 4,
+      "title": "I Had Some Help",
+      "artist": "Post Malone",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/1f/70/04/1f7004b7-414e-a89c-0148-abdd38981be8/mzaf_10246855408392712577.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/i-had-some-help-feat-morgan-wallen/1744452421?i=1744452425&uo=4",
+      "trackId": 1744452425,
+      "explicit": false
+    },
+    {
+      "rank": 5,
+      "title": "Lovin On Me",
+      "artist": "Jack Harlow",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/f4/6e/5a/f46e5aab-e970-1b1d-c0a3-473808a0e265/mzaf_9582060488473069126.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/lovin-on-me/1715920030?i=1715920580&uo=4",
+      "trackId": 1715920580,
+      "explicit": false
+    },
+    {
+      "rank": 6,
+      "title": "Not Like Us",
+      "artist": "Kendrick Lamar",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/2d/e0/e8/2de0e874-cd0b-e9a9-e876-76be13a86662/mzaf_12385336780649591409.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/not-like-us/1781353928?i=1781353929&uo=4",
+      "trackId": 1781353929,
+      "explicit": false
+    },
+    {
+      "rank": 7,
+      "title": "Espresso",
+      "artist": "Sabrina Carpenter",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/99/da/ff/99daffce-cdde-59c6-5ae0-7f922ce411a8/mzaf_5621292401829922816.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/espresso/1752214909?i=1752214923&uo=4",
+      "trackId": 1752214923,
+      "explicit": false
+    },
+    {
+      "rank": 8,
+      "title": "MILLION DOLLAR BABY",
+      "artist": "Tommy Richman",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/60/f3/f5/60f3f55c-632b-3c02-0f32-35dc96cf41e6/mzaf_6126321533848256729.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/million-dollar-baby/1749616853?i=1749616863&uo=4",
+      "trackId": 1749616863,
+      "explicit": false
+    },
+    {
+      "rank": 9,
+      "title": "I Remember Everything",
+      "artist": "Zach Bryan",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/63/45/a6/6345a6ae-7bbf-3d4f-c221-6795462e41e6/mzaf_15573528478892003939.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/i-remember-everything-feat-kacey-musgraves/1703216858?i=1703217516&uo=4",
+      "trackId": 1703217516,
+      "explicit": false
+    },
+    {
+      "rank": 10,
+      "title": "Too Sweet",
+      "artist": "Hozier",
+      "previewUrl": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/a6/61/fc/a661fcaf-f8e5-03db-36f3-31f2e196b1a5/mzaf_18300083713037280538.plus.aac.p.m4a",
+      "url": "https://music.apple.com/us/album/too-sweet/1735414393?i=1735414394&uo=4",
+      "trackId": 1735414394,
+      "explicit": false
+    }
+  ]
+}

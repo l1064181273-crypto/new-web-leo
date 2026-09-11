@@ -6,17 +6,23 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: 3000,
-    allowedHosts: true,
-    hmr: {
-      overlay: false,
-    },
+    watch: { ignored: ["**/artifacts/**", "**/deliverables/**"] },
   },
   preview: {
-    host: "0.0.0.0",
+    host: "127.0.0.1",
     port: 3000,
-    allowedHosts: true,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          motion: ["framer-motion", "react-rnd"],
+        },
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

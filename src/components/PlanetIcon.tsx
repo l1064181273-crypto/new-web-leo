@@ -3,7 +3,7 @@ import { LucideIcon } from "lucide-react";
 
 interface PlanetIconProps {
   icon: LucideIcon;
-  color: string;
+  color?: string;
   size?: number;
   type: "daily" | "music" | "study" | "film" | "photo" | "food" | "game";
 }

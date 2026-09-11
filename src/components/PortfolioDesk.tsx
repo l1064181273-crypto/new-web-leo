@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
   ArrowUpRight,
   Bot,
   Check,
@@ -47,7 +49,7 @@ type AppDefinition = {
 };
 
 const apps: AppDefinition[] = [
-  { id: "github", label: "GitHub", eyebrow: "EXTERNAL", x: "2%", y: "3%", href: "https://github.com/l1064181273-crypto/leo-homepage" },
+  { id: "github", label: "GitHub", eyebrow: "EXTERNAL", x: "2%", y: "3%", href: "https://github.com/l1064181273-crypto/new-web-leo" },
   { id: "music", label: "Music", eyebrow: "SOUND ARCHIVE", x: "25%", y: "17%" },
   { id: "resume", label: "Resume", eyebrow: "CAREER", x: "47%", y: "4%" },
   { id: "build", label: "Build Log", eyebrow: "VIBE CODING", x: "75%", y: "15%" },
@@ -237,8 +239,8 @@ const BuildContent = () => (
       <div className="os-build-notes">
         <div><span>角色</span><strong>产品经理和开发者</strong></div>
         <div><span>技术</span><strong>React TypeScript Motion</strong></div>
-        <div><span>证据</span><strong>Git 历史和线上网站</strong></div>
-        <a href="https://github.com/l1064181273-crypto/leo-homepage" target="_blank" rel="noreferrer">
+        <div><span>证据</span><strong>Git 历史和本地测试</strong></div>
+        <a href="https://github.com/l1064181273-crypto/new-web-leo" target="_blank" rel="noreferrer">
           查看 GitHub 仓库 <ArrowUpRight size={15} />
         </a>
       </div>
@@ -269,8 +271,12 @@ const projectIconMap: Record<ProjectApp, ReactNode> = {
   source: <Github size={17} />,
 };
 
-const ProjectHub = ({ initialId }: { initialId: ProjectApp }) => {
+const ProjectHub = ({ initialId, onSectionChange }: { initialId: ProjectApp; onSectionChange?: (title: string) => void }) => {
   const [selectedId, setSelectedId] = useState<ProjectApp>(initialId);
+  const select = (id: ProjectApp) => {
+    setSelectedId(id);
+    onSectionChange?.(appMap[id].label);
+  };
   const SelectedContent = selectedId === "build"
     ? BuildContent
     : selectedId === "source"
@@ -290,7 +296,7 @@ const ProjectHub = ({ initialId }: { initialId: ProjectApp }) => {
               type="button"
               key={id}
               className={selectedId === id ? "is-active" : ""}
-              onClick={() => setSelectedId(id)}
+              onClick={() => select(id)}
             >
               {projectIconMap[id]}
               <span>{appMap[id].label}</span>
@@ -314,6 +320,10 @@ const ProjectHub = ({ initialId }: { initialId: ProjectApp }) => {
           <SelectedContent />
         </motion.div>
       </section>
+      <nav className="project-pager" aria-label="切换项目">
+        <button title="上一个项目" aria-label="上一个项目" onClick={() => select(projectApps[(projectApps.indexOf(selectedId) + projectApps.length - 1) % projectApps.length])}><ChevronLeft size={24} /></button>
+        <button title="下一个项目" aria-label="下一个项目" onClick={() => select(projectApps[(projectApps.indexOf(selectedId) + 1) % projectApps.length])}><ChevronRight size={24} /></button>
+      </nav>
     </div>
   );
 };
@@ -349,7 +359,7 @@ const GithubContent = () => (
     <p className="os-content-kicker">SOURCE AND HISTORY</p>
     <h2>每一次改版都有记录</h2>
     <p>你可以在 GitHub 看到这个网站如何从想法一步步变成现在的样子</p>
-    <a href="https://github.com/l1064181273-crypto/leo-homepage" target="_blank" rel="noreferrer">
+    <a href="https://github.com/l1064181273-crypto/new-web-leo" target="_blank" rel="noreferrer">
       打开 GitHub <ExternalLink size={15} />
     </a>
   </div>
@@ -358,11 +368,32 @@ const GithubContent = () => (
 const ContactContent = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState("");
+  const copyReset = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (copyReset.current !== null)
+        window.clearTimeout(copyReset.current);
+    },
+    [],
+  );
 
   const copyWechat = async () => {
-    await navigator.clipboard.writeText("Lntano.");
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    setCopyError("");
+    if (copyReset.current !== null)
+      window.clearTimeout(copyReset.current);
+    try {
+      await navigator.clipboard.writeText("Lntano.");
+      setCopied(true);
+      copyReset.current = window.setTimeout(() => {
+        setCopied(false);
+        copyReset.current = null;
+      }, 1800);
+    } catch {
+      setCopied(false);
+      setCopyError("复制失败，请手动选取微信号。");
+    }
   };
 
   return (
@@ -418,6 +449,7 @@ const ContactContent = () => {
                     {copied ? <Check size={15} /> : <Copy size={15} />}
                     {copied ? "已复制" : "复制微信号"}
                   </button>
+                  <p role="status">{copyError}</p>
                 </div>
               </div>
               <a href="https://github.com/l1064181273-crypto" target="_blank" rel="noreferrer">
@@ -462,7 +494,7 @@ const contentByApp: Record<DesktopApp, () => JSX.Element> = {
   music: () => <PersonalAtlas initialCollectionId="sound" />,
   cats: CatContent,
   resume: ResumeContent,
-  life: PersonalAtlas,
+  life: () => <PersonalAtlas />,
   github: GithubContent,
   source: () => <ProjectHub initialId="source" />,
   contact: ContactContent,
@@ -693,3 +725,4 @@ const PortfolioDesk = () => {
 };
 
 export default PortfolioDesk;
+export { AboutContent, ResumeContent, ProjectHub, ContactContent, GithubContent };

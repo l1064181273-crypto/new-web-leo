@@ -306,10 +306,10 @@ function OrbitRing({ radius, tilt = 0, color = "#ffffff", opacity = 0.08 }: {
   const geo = useMemo(() => new THREE.BufferGeometry().setFromPoints(points), [points]);
 
   return (
-    <line rotation={[tilt, 0, 0]}>
+    <lineLoop rotation={[tilt, 0, 0]}>
       <primitive object={geo} attach="geometry" />
       <lineBasicMaterial color={color} transparent opacity={opacity} />
-    </line>
+    </lineLoop>
   );
 }
 

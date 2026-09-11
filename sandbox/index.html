@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>Little Works / 体素工地沙盘</title>
+  <style>/*__STYLES__*/</style>
+</head>
+<body>
+  <main id="sandbox">
+    <canvas id="scene" aria-label="体素建筑工地沙盘" tabindex="0"></canvas>
+    <header class="scene-heading"><span class="brand-mark">LW</span><div><p>THE DESKTOP OBSERVATORY</p><h1>Little Works</h1></div><span class="edition">CONSTRUCTION STUDY / 001</span></header>
+    <div id="scene-error" role="alert" hidden></div>
+    <aside class="scene-readout"><span><i id="run-light"></i> <b id="phase-label">正午</b></span><span id="build-label">基坑与测量 · 0%</span><span id="weather-label">晴朗</span><span id="fps-label">WebGL</span></aside>
+    <nav class="scene-controls" aria-label="工地控制台">
+      <button id="pause" title="暂停或继续机械设备" aria-label="暂停机械">暂停</button>
+      <label>速度<input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"><output id="speed-label">1×</output></label>
+      <label class="day-switch"><input id="cycle" type="checkbox" checked>昼夜</label>
+      <label>时刻<select id="time"><option value="0.25">黎明</option><option value="0.5" selected>正午</option><option value="0.75">黄昏</option><option value="0">夜晚</option></select></label>
+      <label>工序<select id="build-stage"><option value="auto" selected>自动</option><option value="0.08">基坑</option><option value="0.3">基础</option><option value="0.48">一层</option><option value="0.65">二层</option><option value="0.84">封闭</option><option value="0.96">验收</option></select></label>
+      <label>镜头<select id="camera-view"><option value="overview" selected>全景</option><option value="street">街道</option><option value="workers">人员</option><option value="crane">塔吊</option></select></label>
+      <label>扬尘<select id="dust"><option value="0">无</option><option value="0.5" selected>轻</option><option value="1">浓</option></select></label>
+      <button id="rain" aria-pressed="false" title="空格键切换暴雨">暴雨</button>
+      <button id="reset-camera" title="还原观察视角">归位</button>
+    </nav>
+    <footer class="scene-footer"><span>1 : 48 · VOXEL CONSTRUCTION YARD</span><span id="activity-label">设备运行中</span></footer>
+  </main>
+  <script>/*__SCRIPT__*/</script>
+</body>
+</html>

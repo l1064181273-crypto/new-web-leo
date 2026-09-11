@@ -1,8 +1,17 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  content: [
+    "./index.html",
+    "./src/App.tsx",
+    "./src/pages/Index.tsx",
+    "./src/pages/DesktopNotFound.tsx",
+    "./src/components/desktop/**/*.{ts,tsx}",
+    "./src/components/PortfolioDesk.tsx",
+    "./src/components/ui/**/*.{ts,tsx}",
+  ],
   prefix: "",
   theme: {
     container: {
@@ -125,5 +134,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [animate],
 } satisfies Config;

@@ -87,7 +87,10 @@ class SoundEngine {
   private getCtx(): AudioContext | null {
     if (!this.ctx) {
       try {
-        this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass = window.AudioContext ||
+          (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextClass) return null;
+        this.ctx = new AudioContextClass();
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.25;
         this.masterGain.connect(this.ctx.destination);
@@ -296,7 +299,7 @@ async function getEmojiBitmap(emoji: string, size: number): Promise<ImageBitmap 
 
 function detectLowPerf(): boolean {
   // 检测低性能设备：移动端或内存不足
-  const nav = navigator as any;
+  const nav = navigator as Navigator & { deviceMemory?: number };
   if (nav.deviceMemory && nav.deviceMemory < 4) return true;
   if (nav.hardwareConcurrency && nav.hardwareConcurrency < 4) return true;
   // Firefox 在 shadowBlur 上性能较差，降级处理
