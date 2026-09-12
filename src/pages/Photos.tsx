@@ -4,7 +4,6 @@ import ParticleBackground from "@/components/ParticleBackground";
 
 // Import all photos
 const dailyPhotos = [
-  { img: "/src/assets/daily-1.jpg", time: "2025年12月", location: "Cycling", title: "和朋友们的出行 🚴‍♂️" },
   { img: "/src/assets/daily-2.jpg", time: "2025年12月", location: "Mountain", title: "老君山上吃泡面 🍝" },
   { img: "/src/assets/daily-3.jpg", time: "2026年1月", location: "Music", title: "妹妹弹古筝给我听 🎶" },
   { img: "/src/assets/daily-4.jpg", time: "2026年1月", location: "Lab", title: "深夜的实验室 🧪" },
@@ -25,7 +24,6 @@ const photographyPhotos = [
   { img: "/src/assets/photo-9.jpg", time: "2026年2月", location: "Macro", title: "雪做的玫瑰" },
   { img: "/src/assets/photo-10.jpg", time: "2026年2月", location: "Minimalism", title: "海边路灯" },
   { img: "/src/assets/photo-11.jpg", time: "2026年3月", location: "City", title: "湖滨远眺" },
-  { img: "/src/assets/photo-12.jpg", time: "2026年3月", location: "Portrait", title: "听海" },
   { img: "/src/assets/photo-13.jpg", time: "2026年3月", location: "Sports", title: "雪山飞驰" },
 ];
 

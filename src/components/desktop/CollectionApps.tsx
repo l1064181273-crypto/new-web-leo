@@ -19,7 +19,6 @@ export function PhotographyApp({ favorites, toggleFavorite }: { favorites: strin
 }
 
 const journalNotes = [
-  "和朋友一起出发。关于路途，也关于陪伴。",
   "老君山，山顶的一碗泡面。",
   "妹妹弹古筝的片刻，留在生活的声音里。",
   "实验室的日常。记录研究之外的小瞬间。",
@@ -32,7 +31,7 @@ export function DaybookApp() {
   const [index, setIndex] = useState(0);
   const item = items[index];
   return <div className="daybook">
-    <aside><header><small>PERSONAL JOURNAL</small><h2>Daybook<span>.</span></h2><p>一些普通而珍贵的日子</p></header><nav aria-label="日记条目">{items.map((entry, i) => <button aria-current={i === index} key={entry.id} onClick={() => setIndex(i)}><span>{String(i + 1).padStart(2, "0")}</span><div><small>{entry.subtitle.split(" · ")[1]}</small><strong>{entry.title}</strong></div></button>)}</nav><footer>2025 — 2026<br />SEVEN LITTLE MOMENTS</footer></aside>
+    <aside><header><small>PERSONAL JOURNAL</small><h2>Daybook<span>.</span></h2><p>一些普通而珍贵的日子</p></header><nav aria-label="日记条目">{items.map((entry, i) => <button aria-current={i === index} key={entry.id} onClick={() => setIndex(i)}><span>{String(i + 1).padStart(2, "0")}</span><div><small>{entry.subtitle.split(" · ")[1]}</small><strong>{entry.title}</strong></div></button>)}</nav><footer>2025 — 2026<br />SIX LITTLE MOMENTS</footer></aside>
     <article key={item.id}><div className="journal-date"><span>{item.subtitle}</span><small>ENTRY {String(index + 1).padStart(2, "0")}</small></div><h2>{item.title}</h2><figure><img src={item.image} alt={item.title} /></figure><p>{journalNotes[index]}</p><footer><span>Haonan's journal</span><button aria-label="下一篇日记" onClick={() => setIndex((index + 1) % items.length)}>下一篇 <ArrowRight size={15} /></button></footer></article>
   </div>;
 }

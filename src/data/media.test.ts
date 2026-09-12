@@ -3,14 +3,18 @@ import { collectionInfo, filterMedia, media, type CollectionId } from "./media";
 
 describe("original photo migration", () => {
   it("includes every collection image exactly once", () => {
-    expect(media).toHaveLength(47);
-    expect(new Set(media.map((item) => item.id)).size).toBe(47);
+    expect(media).toHaveLength(45);
+    expect(new Set(media.map((item) => item.id)).size).toBe(45);
     expect(
       Object.keys(collectionInfo).map(
         (id) => filterMedia(id as CollectionId).length,
       ),
-    ).toEqual([7, 13, 7, 6, 4, 10]);
+    ).toEqual([6, 12, 7, 6, 4, 10]);
     for (const item of media) expect(item.image).toBeTruthy();
+    expect(media.some((item) => item.id === "daily-1.jpg")).toBe(false);
+    expect(media.some((item) => item.id === "photo-12.jpg")).toBe(false);
+    expect(media.some((item) => item.title === "和朋友们的出行")).toBe(false);
+    expect(media.some((item) => item.title === "听海")).toBe(false);
   });
   it("searches multilingual titles and collection names", () => {
     expect(filterMedia("photos", "苍山")[0].id).toBe("photo-1.jpg");

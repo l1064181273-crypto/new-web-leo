@@ -16,7 +16,6 @@ import photo8 from "@/assets/photo-8.jpg";
 import photo9 from "@/assets/photo-9.jpg";
 import photo10 from "@/assets/photo-10.jpg";
 import photo11 from "@/assets/photo-11.jpg";
-import photo12 from "@/assets/photo-12.jpg";
 import photo13 from "@/assets/photo-13.jpg";
 
 const photos = [
@@ -31,7 +30,6 @@ const photos = [
   { id: 9, url: photo9, title: "雪做的玫瑰", params: "f/1.8 · 1/60s · ISO 400", category: "Macro" },
   { id: 10, url: photo10, title: "海边路灯", params: "f/4.0 · 1/500s · ISO 50", category: "Minimalism" },
   { id: 11, url: photo11, title: "湖滨远眺", params: "f/8.0 · 1/250s · ISO 100", category: "City" },
-  { id: 12, url: photo12, title: "听海", params: "f/2.8 · 1/200s · ISO 100", category: "Portrait" },
   { id: 13, url: photo13, title: "雪山飞驰", params: "GoPro · 4K · 60fps", category: "Sports" },
 ];
 

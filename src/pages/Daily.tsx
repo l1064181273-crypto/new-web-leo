@@ -4,7 +4,6 @@ import Navbar from "@/components/Navbar";
 import ParticleBackground from "@/components/ParticleBackground";
 import { useState, useEffect, useCallback } from "react";
 
-import daily1 from "@/assets/daily-1.jpg";
 import daily2 from "@/assets/daily-2.jpg";
 import daily3 from "@/assets/daily-3.jpg";
 import daily4 from "@/assets/daily-4.jpg";
@@ -13,7 +12,6 @@ import daily6 from "@/assets/daily-6.jpg";
 import daily7 from "@/assets/daily-7.jpg";
 
 const photos = [
-  { id: 1, url: daily1, caption: "和朋友们的出行 🚴‍♂️", location: "Cycling" },
   { id: 2, url: daily2, caption: "老君山上吃泡面 🍝", location: "Mountain" },
   { id: 3, url: daily3, caption: "妹妹弹古筝给我听 🎶", location: "Music" },
   { id: 4, url: daily4, caption: "深夜的实验室 🧪", location: "Lab" },
@@ -22,11 +20,11 @@ const photos = [
   { id: 7, url: daily7, caption: "可爱的小狗 🐕", location: "Pet" },
 ];
 
-// 方案A 布局：2-1-2-2
+// 方案A 布局：2-1-2-1
 // Row 1: photo[0] + photo[1]  各 50%，aspect-ratio 4/3
 // Row 2: photo[2]             全宽横幅，aspect-ratio 21/8
 // Row 3: photo[3] + photo[4]  各 50%，aspect-ratio 4/3
-// Row 4: photo[5] + photo[6]  各 50%，aspect-ratio 4/3
+// Row 4: photo[5]             全宽横幅，aspect-ratio 21/8
 
 const PhotoCard = ({
   photo,
@@ -198,15 +196,10 @@ const Daily = () => {
               onLike={(e) => toggleLike(photos[4].id, e)} />
           </div>
 
-          {/* Row 4: 两列等宽 */}
-          <div className="grid grid-cols-2 gap-4">
-            <PhotoCard photo={photos[5]} index={5} aspectClass="aspect-[4/3]"
-              onClick={() => openLightbox(5)} liked={likedIds.has(photos[5].id)}
-              onLike={(e) => toggleLike(photos[5].id, e)} />
-            <PhotoCard photo={photos[6]} index={6} aspectClass="aspect-[4/3]"
-              onClick={() => openLightbox(6)} liked={likedIds.has(photos[6].id)}
-              onLike={(e) => toggleLike(photos[6].id, e)} />
-          </div>
+          {/* Row 4: 全宽横幅 */}
+          <PhotoCard photo={photos[5]} index={5} aspectClass="aspect-[21/8]"
+            onClick={() => openLightbox(5)} liked={likedIds.has(photos[5].id)}
+            onLike={(e) => toggleLike(photos[5].id, e)} />
 
         </div>
       </main>

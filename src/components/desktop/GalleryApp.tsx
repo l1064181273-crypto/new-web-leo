@@ -91,7 +91,8 @@ export default function GalleryApp({
             }}
           >
             <Heart size={17} />
-            个人收藏<small>{favorites.length}</small>
+            个人收藏
+            <small>{filterMedia("favorites", "", favorites).length}</small>
           </button>
           <div className="sidebar-heading albums-label">相簿</div>
           {(Object.keys(collectionInfo) as CollectionId[]).map((id) => {

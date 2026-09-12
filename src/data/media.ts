@@ -55,7 +55,6 @@ export const collectionInfo: Record<
 };
 
 const entries: [CollectionId, string, string, string][] = [
-  ["daily", "daily-1.jpg", "和朋友们的出行", "骑行 · 2025.12"],
   ["daily", "daily-2.jpg", "山顶的一碗泡面", "老君山 · 2025.12"],
   ["daily", "daily-3.jpg", "弦上片刻", "妹妹的古筝 · 2026.01"],
   ["daily", "daily-4.jpg", "深夜实验室", "研究生日常 · 2026.01"],
@@ -73,7 +72,6 @@ const entries: [CollectionId, string, string, string][] = [
   ["photos", "photo-9.jpg", "雪做的玫瑰", "Macro"],
   ["photos", "photo-10.jpg", "海边路灯", "Minimalism"],
   ["photos", "photo-11.jpg", "湖滨远眺", "City"],
-  ["photos", "photo-12.jpg", "听海", "Portrait"],
   ["photos", "photo-13.jpg", "雪山飞驰", "Sports"],
   ["artists", "artists/jay-chou.jpg", "周杰伦", "华语流行 / R&B"],
   ["artists", "artists/eason-chan.jpg", "陈奕迅", "粤语 / 华语流行"],

@@ -42,7 +42,7 @@ test("desktop has local artwork, a dock and no overflowing shortcuts", async ({
   expect(errors).toEqual([]);
 });
 
-test("atlas loads all 47 original images and filters each album", async ({
+test("atlas loads all 45 selected images and filters each album", async ({
   page,
 }, testInfo) => {
   await ready(page, "atlas");
@@ -50,7 +50,9 @@ test("atlas loads all 47 original images and filters each album", async ({
     name: "Personal Atlas 窗口",
     exact: true,
   });
-  await expect(atlas.locator(".media-open")).toHaveCount(47);
+  await expect(atlas.locator(".media-open")).toHaveCount(45);
+  await expect(atlas.getByText("和朋友们的出行", { exact: true })).toHaveCount(0);
+  await expect(atlas.getByText("听海", { exact: true })).toHaveCount(0);
   for (const img of await atlas.locator(".media-open img").all()) {
     await img.scrollIntoViewIfNeeded();
     await expect
@@ -62,8 +64,8 @@ test("atlas loads all 47 original images and filters each album", async ({
       .toBe(true);
   }
   for (const [name, count] of [
-    ["日常点滴", 7],
-    ["光影瞬间", 13],
+    ["日常点滴", 6],
+    ["光影瞬间", 12],
     ["音乐收藏", 7],
     ["电影收藏", 6],
     ["游戏收藏", 4],
