@@ -1,0 +1,27 @@
+# Upload source only; Vercel installs dependencies and builds the site.
+.git/
+.vercel/
+.agents/
+.codex/
+node_modules/
+dist/
+dist-ssr/
+artifacts/
+deliverables/
+playwright-report/
+test-results/
+logs/
+*.log
+.DS_Store
+.env
+.env.*
+/*.pem
+/*.key
+/*.p12
+/*.pfx
+
+# Local journals and deployment handoffs are never uploaded.
+docs/V2_PLAN.md
+docs/ITERATION_LOG.md
+docs/QA_MATRIX.md
+docs/STUDIO-V2-HANDOFF.md

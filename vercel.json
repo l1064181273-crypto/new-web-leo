@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/photos", "destination": "/index.html" },
+    { "source": "/friend", "destination": "/index.html" },
+    { "source": "/daily", "destination": "/index.html" },
+    { "source": "/study", "destination": "/index.html" },
+    { "source": "/photography", "destination": "/index.html" },
+    { "source": "/gaming", "destination": "/index.html" },
+    { "source": "/music", "destination": "/index.html" },
+    { "source": "/film", "destination": "/index.html" },
+    { "source": "/food", "destination": "/index.html" }
+  ]
+}
