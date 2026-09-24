@@ -1,0 +1,882 @@
+{
+  "daily-2.jpg": {
+    "width": 1706,
+    "height": 1279,
+    "variants": [
+      {
+        "file": "daily-2-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "daily-2-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "daily-2-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "daily-3.jpg": {
+    "width": 1920,
+    "height": 1440,
+    "variants": [
+      {
+        "file": "daily-3-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "daily-3-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "daily-3-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "daily-4.jpg": {
+    "width": 1279,
+    "height": 1706,
+    "variants": [
+      {
+        "file": "daily-4-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "daily-4-320.jpg",
+        "width": 320,
+        "height": 427
+      },
+      {
+        "file": "daily-4-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "daily-5.jpg": {
+    "width": 1080,
+    "height": 1920,
+    "variants": [
+      {
+        "file": "daily-5-160.jpg",
+        "width": 160,
+        "height": 284
+      },
+      {
+        "file": "daily-5-320.jpg",
+        "width": 320,
+        "height": 569
+      },
+      {
+        "file": "daily-5-640.jpg",
+        "width": 640,
+        "height": 1137
+      }
+    ]
+  },
+  "daily-6.jpg": {
+    "width": 1080,
+    "height": 1920,
+    "variants": [
+      {
+        "file": "daily-6-160.jpg",
+        "width": 160,
+        "height": 284
+      },
+      {
+        "file": "daily-6-320.jpg",
+        "width": 320,
+        "height": 569
+      },
+      {
+        "file": "daily-6-640.jpg",
+        "width": 640,
+        "height": 1137
+      }
+    ]
+  },
+  "daily-7.jpg": {
+    "width": 1279,
+    "height": 1706,
+    "variants": [
+      {
+        "file": "daily-7-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "daily-7-320.jpg",
+        "width": 320,
+        "height": 427
+      },
+      {
+        "file": "daily-7-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "photo-1.jpg": {
+    "width": 810,
+    "height": 1080,
+    "variants": [
+      {
+        "file": "photo-1-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "photo-1-320.jpg",
+        "width": 320,
+        "height": 426
+      },
+      {
+        "file": "photo-1-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "photo-2.jpg": {
+    "width": 1920,
+    "height": 1440,
+    "variants": [
+      {
+        "file": "photo-2-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-2-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-2-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-3.jpg": {
+    "width": 1920,
+    "height": 1440,
+    "variants": [
+      {
+        "file": "photo-3-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-3-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-3-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-4.jpg": {
+    "width": 1920,
+    "height": 1440,
+    "variants": [
+      {
+        "file": "photo-4-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-4-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-4-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-5.jpg": {
+    "width": 1920,
+    "height": 1440,
+    "variants": [
+      {
+        "file": "photo-5-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-5-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-5-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-6.jpg": {
+    "width": 1440,
+    "height": 1080,
+    "variants": [
+      {
+        "file": "photo-6-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-6-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-6-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-7.jpg": {
+    "width": 1773,
+    "height": 2364,
+    "variants": [
+      {
+        "file": "photo-7-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "photo-7-320.jpg",
+        "width": 320,
+        "height": 426
+      },
+      {
+        "file": "photo-7-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "photo-8.jpg": {
+    "width": 1279,
+    "height": 1706,
+    "variants": [
+      {
+        "file": "photo-8-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "photo-8-320.jpg",
+        "width": 320,
+        "height": 427
+      },
+      {
+        "file": "photo-8-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "photo-9.jpg": {
+    "width": 1279,
+    "height": 1706,
+    "variants": [
+      {
+        "file": "photo-9-160.jpg",
+        "width": 160,
+        "height": 213
+      },
+      {
+        "file": "photo-9-320.jpg",
+        "width": 320,
+        "height": 427
+      },
+      {
+        "file": "photo-9-640.jpg",
+        "width": 640,
+        "height": 853
+      }
+    ]
+  },
+  "photo-10.jpg": {
+    "width": 1280,
+    "height": 1925,
+    "variants": [
+      {
+        "file": "photo-10-160.jpg",
+        "width": 160,
+        "height": 240
+      },
+      {
+        "file": "photo-10-320.jpg",
+        "width": 320,
+        "height": 481
+      },
+      {
+        "file": "photo-10-640.jpg",
+        "width": 640,
+        "height": 962
+      }
+    ]
+  },
+  "photo-11.jpg": {
+    "width": 1706,
+    "height": 1279,
+    "variants": [
+      {
+        "file": "photo-11-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "photo-11-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "photo-11-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "photo-13.jpg": {
+    "width": 1440,
+    "height": 1818,
+    "variants": [
+      {
+        "file": "photo-13-160.jpg",
+        "width": 160,
+        "height": 202
+      },
+      {
+        "file": "photo-13-320.jpg",
+        "width": 320,
+        "height": 404
+      },
+      {
+        "file": "photo-13-640.jpg",
+        "width": 640,
+        "height": 808
+      }
+    ]
+  },
+  "artists/jay-chou.jpg": {
+    "width": 400,
+    "height": 400,
+    "variants": [
+      {
+        "file": "artists/jay-chou-160.jpg",
+        "width": 160,
+        "height": 160
+      },
+      {
+        "file": "artists/jay-chou-320.jpg",
+        "width": 320,
+        "height": 320
+      }
+    ]
+  },
+  "artists/eason-chan.jpg": {
+    "width": 1200,
+    "height": 1200,
+    "variants": [
+      {
+        "file": "artists/eason-chan-160.jpg",
+        "width": 160,
+        "height": 160
+      },
+      {
+        "file": "artists/eason-chan-320.jpg",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "file": "artists/eason-chan-640.jpg",
+        "width": 640,
+        "height": 640
+      }
+    ]
+  },
+  "artists/taylor-swift.png": {
+    "width": 1200,
+    "height": 1200,
+    "variants": [
+      {
+        "file": "artists/taylor-swift-160.jpg",
+        "width": 160,
+        "height": 160
+      },
+      {
+        "file": "artists/taylor-swift-320.jpg",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "file": "artists/taylor-swift-640.jpg",
+        "width": 640,
+        "height": 640
+      }
+    ]
+  },
+  "artists/linkin-park.jpg": {
+    "width": 1500,
+    "height": 1500,
+    "variants": [
+      {
+        "file": "artists/linkin-park-160.jpg",
+        "width": 160,
+        "height": 160
+      },
+      {
+        "file": "artists/linkin-park-320.jpg",
+        "width": 320,
+        "height": 320
+      },
+      {
+        "file": "artists/linkin-park-640.jpg",
+        "width": 640,
+        "height": 640
+      }
+    ]
+  },
+  "artists/wang-leehom.jpg": {
+    "width": 512,
+    "height": 384,
+    "variants": [
+      {
+        "file": "artists/wang-leehom-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "artists/wang-leehom-320.jpg",
+        "width": 320,
+        "height": 240
+      }
+    ]
+  },
+  "artists/charlie-puth.jpg": {
+    "width": 958,
+    "height": 1000,
+    "variants": [
+      {
+        "file": "artists/charlie-puth-160.jpg",
+        "width": 160,
+        "height": 167
+      },
+      {
+        "file": "artists/charlie-puth-320.jpg",
+        "width": 320,
+        "height": 334
+      }
+    ]
+  },
+  "artists/li-jian.jpg": {
+    "width": 250,
+    "height": 250,
+    "variants": [
+      {
+        "file": "artists/li-jian-160.jpg",
+        "width": 160,
+        "height": 160
+      }
+    ]
+  },
+  "films/interstellar.jpg": {
+    "width": 1381,
+    "height": 2015,
+    "variants": [
+      {
+        "file": "films/interstellar-160.jpg",
+        "width": 160,
+        "height": 233
+      },
+      {
+        "file": "films/interstellar-320.jpg",
+        "width": 320,
+        "height": 467
+      },
+      {
+        "file": "films/interstellar-640.jpg",
+        "width": 640,
+        "height": 934
+      }
+    ]
+  },
+  "films/shawshank.jpg": {
+    "width": 1200,
+    "height": 1800,
+    "variants": [
+      {
+        "file": "films/shawshank-160.jpg",
+        "width": 160,
+        "height": 240
+      },
+      {
+        "file": "films/shawshank-320.jpg",
+        "width": 320,
+        "height": 480
+      },
+      {
+        "file": "films/shawshank-640.jpg",
+        "width": 640,
+        "height": 960
+      }
+    ]
+  },
+  "films/spirited-away.jpg": {
+    "width": 336,
+    "height": 475,
+    "variants": [
+      {
+        "file": "films/spirited-away-160.jpg",
+        "width": 160,
+        "height": 226
+      }
+    ]
+  },
+  "films/inception.jpg": {
+    "width": 1659,
+    "height": 2440,
+    "variants": [
+      {
+        "file": "films/inception-160.jpg",
+        "width": 160,
+        "height": 235
+      },
+      {
+        "file": "films/inception-320.jpg",
+        "width": 320,
+        "height": 470
+      },
+      {
+        "file": "films/inception-640.jpg",
+        "width": 640,
+        "height": 941
+      }
+    ]
+  },
+  "films/forrest-gump.jpg": {
+    "width": 2000,
+    "height": 3000,
+    "variants": [
+      {
+        "file": "films/forrest-gump-160.jpg",
+        "width": 160,
+        "height": 240
+      },
+      {
+        "file": "films/forrest-gump-320.jpg",
+        "width": 320,
+        "height": 480
+      },
+      {
+        "file": "films/forrest-gump-640.jpg",
+        "width": 640,
+        "height": 960
+      }
+    ]
+  },
+  "films/the-matrix.jpg": {
+    "width": 338,
+    "height": 500,
+    "variants": [
+      {
+        "file": "films/the-matrix-160.jpg",
+        "width": 160,
+        "height": 236
+      }
+    ]
+  },
+  "game-wukong.jpg": {
+    "width": 1920,
+    "height": 1071,
+    "variants": [
+      {
+        "file": "game-wukong-160.jpg",
+        "width": 160,
+        "height": 89
+      },
+      {
+        "file": "game-wukong-320.jpg",
+        "width": 320,
+        "height": 178
+      },
+      {
+        "file": "game-wukong-640.jpg",
+        "width": 640,
+        "height": 357
+      }
+    ]
+  },
+  "game-eldenring.jpg": {
+    "width": 1376,
+    "height": 768,
+    "variants": [
+      {
+        "file": "game-eldenring-160.jpg",
+        "width": 160,
+        "height": 89
+      },
+      {
+        "file": "game-eldenring-320.jpg",
+        "width": 320,
+        "height": 178
+      },
+      {
+        "file": "game-eldenring-640.jpg",
+        "width": 640,
+        "height": 357
+      }
+    ]
+  },
+  "game-cyberpunk.jpg": {
+    "width": 1376,
+    "height": 768,
+    "variants": [
+      {
+        "file": "game-cyberpunk-160.jpg",
+        "width": 160,
+        "height": 89
+      },
+      {
+        "file": "game-cyberpunk-320.jpg",
+        "width": 320,
+        "height": 178
+      },
+      {
+        "file": "game-cyberpunk-640.jpg",
+        "width": 640,
+        "height": 357
+      }
+    ]
+  },
+  "game-crossfire.jpg": {
+    "width": 1376,
+    "height": 768,
+    "variants": [
+      {
+        "file": "game-crossfire-160.jpg",
+        "width": 160,
+        "height": 89
+      },
+      {
+        "file": "game-crossfire-320.jpg",
+        "width": 320,
+        "height": 178
+      },
+      {
+        "file": "game-crossfire-640.jpg",
+        "width": 640,
+        "height": 357
+      }
+    ]
+  },
+  "food/sichuan-hotpot.jpg": {
+    "width": 600,
+    "height": 902,
+    "variants": [
+      {
+        "file": "food/sichuan-hotpot-160.jpg",
+        "width": 160,
+        "height": 240
+      },
+      {
+        "file": "food/sichuan-hotpot-320.jpg",
+        "width": 320,
+        "height": 481
+      }
+    ]
+  },
+  "food/cantonese-dimsum.jpg": {
+    "width": 2560,
+    "height": 1709,
+    "variants": [
+      {
+        "file": "food/cantonese-dimsum-160.jpg",
+        "width": 160,
+        "height": 107
+      },
+      {
+        "file": "food/cantonese-dimsum-320.jpg",
+        "width": 320,
+        "height": 213
+      },
+      {
+        "file": "food/cantonese-dimsum-640.jpg",
+        "width": 640,
+        "height": 427
+      }
+    ]
+  },
+  "food/japanese-sushi.jpg": {
+    "width": 1920,
+    "height": 1080,
+    "variants": [
+      {
+        "file": "food/japanese-sushi-160.jpg",
+        "width": 160,
+        "height": 90
+      },
+      {
+        "file": "food/japanese-sushi-320.jpg",
+        "width": 320,
+        "height": 180
+      },
+      {
+        "file": "food/japanese-sushi-640.jpg",
+        "width": 640,
+        "height": 360
+      }
+    ]
+  },
+  "food/bbq-grilled-meat.jpg": {
+    "width": 1520,
+    "height": 2280,
+    "variants": [
+      {
+        "file": "food/bbq-grilled-meat-160.jpg",
+        "width": 160,
+        "height": 240
+      },
+      {
+        "file": "food/bbq-grilled-meat-320.jpg",
+        "width": 320,
+        "height": 480
+      },
+      {
+        "file": "food/bbq-grilled-meat-640.jpg",
+        "width": 640,
+        "height": 960
+      }
+    ]
+  },
+  "food/italian-pasta.jpg": {
+    "width": 1500,
+    "height": 1000,
+    "variants": [
+      {
+        "file": "food/italian-pasta-160.jpg",
+        "width": 160,
+        "height": 106
+      },
+      {
+        "file": "food/italian-pasta-320.jpg",
+        "width": 320,
+        "height": 213
+      },
+      {
+        "file": "food/italian-pasta-640.jpg",
+        "width": 640,
+        "height": 426
+      }
+    ]
+  },
+  "food/yunnan-mushroom.webp": {
+    "width": 2048,
+    "height": 1536,
+    "variants": [
+      {
+        "file": "food/yunnan-mushroom-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "food/yunnan-mushroom-320.jpg",
+        "width": 320,
+        "height": 240
+      },
+      {
+        "file": "food/yunnan-mushroom-640.jpg",
+        "width": 640,
+        "height": 480
+      }
+    ]
+  },
+  "food/chengdu-skewers.jpg": {
+    "width": 800,
+    "height": 600,
+    "variants": [
+      {
+        "file": "food/chengdu-skewers-160.jpg",
+        "width": 160,
+        "height": 120
+      },
+      {
+        "file": "food/chengdu-skewers-320.jpg",
+        "width": 320,
+        "height": 240
+      }
+    ]
+  },
+  "food/tokyo-sushi-omakase.jpg": {
+    "width": 1280,
+    "height": 720,
+    "variants": [
+      {
+        "file": "food/tokyo-sushi-omakase-160.jpg",
+        "width": 160,
+        "height": 90
+      },
+      {
+        "file": "food/tokyo-sushi-omakase-320.jpg",
+        "width": 320,
+        "height": 180
+      },
+      {
+        "file": "food/tokyo-sushi-omakase-640.jpg",
+        "width": 640,
+        "height": 360
+      }
+    ]
+  },
+  "food/beijing-duck.jpg": {
+    "width": 1024,
+    "height": 644,
+    "variants": [
+      {
+        "file": "food/beijing-duck-160.jpg",
+        "width": 160,
+        "height": 100
+      },
+      {
+        "file": "food/beijing-duck-320.jpg",
+        "width": 320,
+        "height": 201
+      },
+      {
+        "file": "food/beijing-duck-640.jpg",
+        "width": 640,
+        "height": 402
+      }
+    ]
+  },
+  "food/sanya-seafood.jpg": {
+    "width": 768,
+    "height": 1152,
+    "variants": [
+      {
+        "file": "food/sanya-seafood-160.jpg",
+        "width": 160,
+        "height": 240
+      }
+    ]
+  }
+}

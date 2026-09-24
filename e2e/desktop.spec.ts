@@ -5,6 +5,17 @@ async function ready(page: Page, app = "") {
   await expect(page.locator(".desktop-boot")).toHaveCount(0);
 }
 
+async function openNotesList(page: Page) {
+  await expect(page.locator(".studio-notes")).toBeVisible();
+  const trigger = page.getByRole("button", { name: "打开便签列表", exact: true });
+  if (await trigger.isVisible()) await trigger.click();
+}
+
+async function selectTestNote(page: Page) {
+  await page.getByRole("navigation", { name: "便签列表", exact: true })
+    .getByRole("button", { name: /E2E test note/ }).click();
+}
+
 test("desktop has local artwork, a dock and no overflowing shortcuts", async ({
   page,
 }, testInfo) => {
@@ -71,7 +82,8 @@ test("atlas loads all 45 selected images and filters each album", async ({
     ["游戏收藏", 4],
     ["舌尖记忆", 10],
   ] as const) {
-    await atlas.getByRole("button", { name: new RegExp(name) }).click();
+    await atlas.getByRole("navigation", { name: "相册分类", exact: true })
+      .getByRole("button", { name: new RegExp(name) }).click();
     await expect(atlas.locator(".media-open")).toHaveCount(count);
   }
   await page.screenshot({
@@ -87,14 +99,21 @@ test("photography has a focused viewer, favorites and keyboard navigation", asyn
     exact: true,
   });
   await expect(photography.getByRole("img", { name: "暮色苍山" })).toBeVisible();
-  await photography.getByRole("button", { name: "收藏照片" }).click();
+  await photography.getByRole("button", { name: "收藏照片", exact: true }).click();
   await photography.getByRole("button", { name: "下一张作品" }).click();
   await expect(photography.getByRole("img", { name: "欧式校园" })).toBeVisible();
   await photography.locator(".photo-studio").focus();
   await page.keyboard.press("ArrowLeft");
   await expect(photography.getByRole("img", { name: "暮色苍山" })).toBeVisible();
+  await photography.getByRole("button", { name: "放大 暮色苍山", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "暮色苍山", exact: true })).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("dialog", { name: "欧式校园", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(photography).toBeVisible();
+  await expect(photography.getByRole("button", { name: "放大 暮色苍山", exact: true })).toBeFocused();
   await page.reload();
-  await expect(photography.getByRole("button", { name: "收藏照片" })).toHaveAttribute("aria-pressed", "true");
+  await expect(photography.getByRole("button", { name: "取消收藏照片", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("reference overlays keep one app visible and return to the desktop", async ({
@@ -106,7 +125,7 @@ test("reference overlays keep one app visible and return to the desktop", async 
     name: "Personal Atlas 窗口",
     exact: true,
   });
-  await atlas.getByLabel("搜索照片").fill("苍山");
+  await atlas.getByLabel("搜索收藏").fill("苍山");
   await atlas.getByRole("button", { name: "收起窗口", exact: true }).click();
   await expect(atlas).toBeHidden();
   await page
@@ -123,13 +142,18 @@ test("reference overlays keep one app visible and return to the desktop", async 
     name: "Personal Atlas 窗口",
     exact: true,
   });
-  await expect(atlas.getByLabel("搜索照片")).toHaveValue("苍山");
+  await expect(atlas.getByLabel("搜索收藏")).toHaveValue("苍山");
   await expect(page.locator(".desktop-window:visible")).toHaveCount(1);
   if (!isMobile) {
+    const original = (await atlas.boundingBox())!;
+    await atlas.getByRole("button", { name: "放大窗口", exact: true }).click();
+    await expect(atlas.getByRole("button", { name: "还原窗口", exact: true })).toHaveAttribute("aria-pressed", "true");
+    expect((await atlas.boundingBox())!.width).toBeGreaterThanOrEqual(original.width);
+    await atlas.getByRole("button", { name: "还原窗口", exact: true }).click();
+    await expect(atlas.getByRole("button", { name: "放大窗口", exact: true })).toHaveAttribute("aria-pressed", "false");
+    await expect.poll(async () => (await atlas.boundingBox())!.width).toBeCloseTo(original.width, 0);
+    await expect(atlas.getByLabel("搜索收藏")).toHaveValue("苍山");
     const previous = await atlas.boundingBox();
-    await expect(
-      atlas.getByRole("button", { name: "最大化窗口", exact: true }),
-    ).toHaveCount(0);
     const header = atlas.locator(".window-titlebar");
     const box = (await header.boundingBox())!;
     await page.mouse.move(box.x + 240, box.y + 20);
@@ -156,17 +180,29 @@ test("reference overlays keep one app visible and return to the desktop", async 
   }
 });
 
-test("Music stays opt-in and exposes the verified chart top ten", async ({ page }) => {
+test("Music exposes the chart top ten and plays local audio only on request", async ({ page }) => {
   await ready(page, "music");
   const player = page.getByRole("dialog", { name: "Music 窗口", exact: true });
   const audio = player.locator("audio");
   expect(
     await audio.evaluate((element: HTMLAudioElement) => element.paused),
   ).toBe(true);
-  await expect(player.locator(".music-library, .track-list")).toHaveCount(0);
+  await expect(player.getByRole("list", { name: "试听歌曲列表", exact: true }).getByRole("listitem")).toHaveCount(10);
+  await expect(player.getByRole("link", { name: "查看 Billboard 榜单来源", exact: true })).toHaveAttribute("href", /billboard\.com/);
   await expect(player.locator(".ipod-screen")).toContainText("Lose Control");
   await player.getByRole("button", { name: "下一首", exact: true }).click();
   await expect(player.locator(".ipod-screen")).toContainText("A Bar Song");
+  await player.getByRole("button", { name: "下一首", exact: true }).click();
+  await expect(player.locator(".ipod-screen")).toContainText("Beautiful Things");
+  await player.getByRole("button", { name: "MENU", exact: true }).click();
+  await expect(player.locator(".ipod-screen")).toContainText("BILLBOARD 2024");
+  // Keep functional playback independent of iTunes availability. The local
+  // source uses the same player controls and native HTMLAudioElement events.
+  await player.getByRole("navigation", { name: "音频来源", exact: true })
+    .getByRole("button", { name: "本站背景音", exact: true }).click();
+  await expect(player.locator(".ipod-screen")).toContainText("Lofi · 桌面背景音");
+  await expect(audio).toHaveAttribute("src", /\/audio\/lofi-ambient\.mp3$/);
+  expect(await audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
   await player.getByRole("button", { name: "播放音乐", exact: true }).click();
   await expect
     .poll(() =>
@@ -177,13 +213,9 @@ test("Music stays opt-in and exposes the verified chart top ten", async ({ page 
   expect(
     await audio.evaluate((element: HTMLAudioElement) => element.paused),
   ).toBe(true);
-  await player.getByRole("button", { name: "下一首", exact: true }).click();
-  await expect(player.locator(".ipod-screen")).toContainText("Beautiful Things");
-  await player.getByRole("button", { name: "MENU", exact: true }).click();
-  await expect(player.locator(".ipod-screen")).toContainText("BILLBOARD 2024");
 });
 
-test("notes persist, export, and require confirmation to delete", async ({
+test("notes persist, export, restore from trash and confirm permanent deletion", async ({
   page,
 }) => {
   await ready(page, "notes");
@@ -191,19 +223,48 @@ test("notes persist, export, and require confirmation to delete", async ({
     name: "Field Notes 窗口",
     exact: true,
   });
-  await notes.getByRole("button", { name: "新建笔记", exact: true }).click();
+  await openNotesList(page);
+  await page.getByRole("button", { name: "新建笔记", exact: true }).click();
   await notes.getByLabel("笔记标题").fill("E2E test note");
   await notes.getByLabel("笔记内容").fill("A local-only note.");
   await page.reload();
+  await expect(page.locator(".desktop-boot")).toHaveCount(0);
+  // Selection is session-local; data persistence is checked after reopening
+  // the saved entry, not by assuming it sorts ahead of the pinned welcome note.
+  await openNotesList(page);
+  await selectTestNote(page);
   await expect(notes.getByLabel("笔记标题")).toHaveValue("E2E test note");
   await expect(notes.getByLabel("笔记内容")).toHaveValue("A local-only note.");
   const downloaded = page.waitForEvent("download");
   await notes.getByRole("button", { name: "导出笔记", exact: true }).click();
-  expect((await downloaded).suggestedFilename()).toBe("leo-note.txt");
-  await notes.getByRole("button", { name: "删除笔记", exact: true }).click();
-  await expect(notes.getByRole("alert")).toBeVisible();
-  await notes.getByRole("button", { name: "取消", exact: true }).click();
+  expect((await downloaded).suggestedFilename()).toBe("E2E test note.txt");
+  await notes.getByRole("button", { name: "移到最近删除", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await openNotesList(page);
+  await page.getByRole("button", { name: "最近删除 · 1", exact: true }).click();
+  await selectTestNote(page);
   await expect(notes.getByLabel("笔记标题")).toHaveValue("E2E test note");
+  await expect(notes.getByLabel("笔记内容")).toHaveAttribute("readonly", "");
+  await notes.getByRole("button", { name: "永久删除这篇便签", exact: true }).click();
+  const confirmation = page.getByRole("alertdialog", { name: "永久删除这篇便签？", exact: true });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "取消，保留便签", exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(notes.getByLabel("笔记标题")).toHaveValue("E2E test note");
+  await notes.getByRole("button", { name: "恢复便签", exact: true }).click();
+  await expect(notes.getByLabel("笔记标题")).toHaveValue("E2E test note");
+  await expect(notes.getByLabel("笔记内容")).toBeEditable();
+  await expect(notes.getByLabel("笔记内容")).toHaveValue("A local-only note.");
+
+  await notes.getByRole("button", { name: "移到最近删除", exact: true }).click();
+  await openNotesList(page);
+  await page.getByRole("button", { name: "最近删除 · 1", exact: true }).click();
+  await selectTestNote(page);
+  await notes.getByRole("button", { name: "永久删除这篇便签", exact: true }).click();
+  await confirmation.getByRole("button", { name: "确认永久删除 1 篇", exact: true }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(notes.getByLabel("笔记标题")).toHaveCount(0);
+  await expect(notes.getByRole("status").filter({ hasText: "已永久删除 1 篇便签" })).toBeVisible();
 });
 
 test("invalid storage and blocked clipboard are handled", async ({
@@ -221,13 +282,13 @@ test("invalid storage and blocked clipboard are handled", async ({
     name: "Connect 窗口",
     exact: true,
   });
-  await contact.getByRole("button", { name: /查看联系方式/ }).click();
   await contact
     .getByRole("button", { name: "复制微信号", exact: true })
     .click();
-  await expect(contact.getByRole("status")).toContainText("复制失败");
+  await expect(contact.getByRole("status")).toHaveText("未能自动复制，请选中下方微信号手动复制。");
   await ready(page, "notes");
-  await expect(page.getByLabel("笔记标题")).toHaveValue("保持好奇，持续创造");
+  await expect(page.getByLabel("笔记标题")).toHaveValue("给路过这个桌面的人");
+  await expect(page.getByRole("button", { name: "导出原始数据", exact: true })).toBeVisible();
 });
 
 test("successful clipboard feedback returns to its idle label", async ({
@@ -244,12 +305,11 @@ test("successful clipboard feedback returns to its idle label", async ({
     name: "Connect 窗口",
     exact: true,
   });
-  await contact.getByRole("button", { name: /查看联系方式/ }).click();
   await contact
     .getByRole("button", { name: "复制微信号", exact: true })
     .click();
   await expect(
-    contact.getByRole("button", { name: "已复制", exact: true }),
+    contact.getByRole("button", { name: "已复制微信号", exact: true }),
   ).toBeVisible();
   await expect(
     contact.getByRole("button", { name: "复制微信号", exact: true }),
@@ -263,9 +323,10 @@ test("search, calendar, settings and legacy routes stay inside the desktop", asy
   await ready(page);
   await page.getByRole("button", { name: "搜索应用", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "搜索桌面应用", exact: true })
+    .getByRole("combobox", { name: "搜索桌面应用", exact: true })
     .fill("Herding");
-  await page.getByRole("button", { name: /Herding Cats 应用程序/ }).click();
+  await expect(page.getByRole("option", { name: /Herding Cats/ })).toBeVisible();
+  await page.getByRole("combobox", { name: "搜索桌面应用", exact: true }).press("Enter");
   await expect(
     page.getByRole("dialog", { name: "Herding Cats 窗口", exact: true }),
   ).toBeVisible();
@@ -319,9 +380,9 @@ test("phone apps are fullscreen and desktop apps leave space for the dock", asyn
       await expect(page.locator(".desktop-dock")).toBeHidden();
     } else
       expect(windowBox.y + windowBox.height).toBeLessThanOrEqual(dockBox.y);
-    await page.getByLabel("搜索照片").fill("test-no-match");
+    await page.getByLabel("搜索收藏").fill("test-no-match");
     await expect(
-      page.getByRole("heading", { name: "没有找到这段记忆" }),
+      page.getByRole("heading", { name: "没有找到相关收藏" }),
     ).toBeVisible();
   }
 });

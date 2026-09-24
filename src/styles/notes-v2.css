@@ -1,0 +1,79 @@
+/* Field Notes keeps its paper-and-leaf palette. Dialog layers stay local to
+   this app instead of changing the desktop shell's window and menu rules. */
+.studio-notes { position: relative; }
+.studio-notes .studio-note-editor { overflow: auto; }
+/* Outrank the desktop input/textarea font reset without changing other apps. */
+.studio-notes .studio-note-title { font-size: 24px; font-weight: 500; line-height: 1.6; }
+.studio-notes .studio-note-body { font-size: 15px; line-height: 1.9; }
+.studio-notes .notes-sidebar-actions { display: flex; align-items: center; gap: 8px; }
+.studio-notes .notes-sidebar-actions button { display: grid; place-items: center; min-width: 34px; min-height: 34px; }
+.studio-notes .notes-drawer-close { border: 1px solid #c6d3bf; border-radius: 6px; color: #4f6943; background: #f7faf4; padding: 7px; }
+.studio-notes .notes-capacity { margin: 0 0 5px; color: #526548; font-size: 10px; line-height: 1.7; }
+.studio-notes .notes-limit-hint { margin: 3px 0 7px; padding: 7px 9px; color: #715530; background: #f4ead8; border-radius: 5px; font-size: 10px; line-height: 1.8; }
+.studio-notes .notes-capacity-warning { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 11px 18px; background: #f4ead8; color: #715530; font-size: 11px; line-height: 1.8; }
+.studio-notes .notes-capacity-warning span { flex: 1; }
+.studio-notes .notes-capacity-warning button { border: 1px solid #cbb997; border-radius: 5px; background: #fff8ed; color: #715530; padding: 7px 9px; white-space: nowrap; }
+.studio-notes .notes-sidebar footer > div { gap: 14px; flex-wrap: wrap; }
+.studio-notes .notes-sidebar footer button:disabled { cursor: default; opacity: .55; }
+.studio-notes .notes-sidebar footer > .notes-purge-link { color: #884d3b; text-decoration: underline; text-underline-offset: 3px; }
+.studio-notes .notes-notice { color: #526a41; }
+.studio-notes .notes-notice button { color: #466137; flex-shrink: 0; min-width: 28px; min-height: 28px; }
+.studio-notes .notes-import-error { background: #f7e9df; color: #804b32; }
+.studio-notes .notes-import-error button { color: #804b32; }
+.studio-notes .notes-trash-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 12px 24px; border-top: 1px solid #e0e6db; color: #607152; font-size: 11px; }
+.studio-notes .notes-trash-actions button { border: 1px solid #d3bdae; border-radius: 5px; background: transparent; color: #884d3b; padding: 7px 9px; }
+.studio-notes .notes-sidebar > header span,
+.studio-notes .notes-section-heading,
+.studio-notes .notes-sidebar > nav small,
+.studio-notes .notes-sidebar > footer > button,
+.studio-notes .notes-sidebar > nav p { color: #526b45; }
+.studio-notes .notes-sidebar > nav strong { color: #435c37; }
+.studio-notes .notes-new,
+.studio-notes .notes-search,
+.studio-notes .notes-search button,
+.studio-notes .studio-note-editor > header button { color: #536e44; }
+.studio-notes .notes-search input::placeholder,
+.studio-notes .studio-note-title::placeholder,
+.studio-notes .studio-note-body::placeholder { color: #66785a; opacity: 1; }
+.studio-notes .studio-note-editor > header > span,
+.studio-notes .note-paper-top,
+.studio-notes .studio-note-editor > footer { color: #536b45; }
+.studio-notes button:focus-visible,
+.studio-notes .notes-search:focus-within,
+.notes-confirm-dialog button:focus-visible { outline: 2px solid #536e44; outline-offset: 3px; }
+.studio-notes .notes-drawer-overlay { position: absolute; inset: 0; z-index: 40; background: #25372566; }
+.studio-notes > .notes-sidebar.notes-mobile-drawer { position: absolute; display: flex; inset: 0 auto 0 0; z-index: 41; width: min(325px, calc(100% - 36px)); max-height: 100%; overflow: auto; background: #edf1ec; border-right: 1px solid #b9c9b0; box-shadow: 12px 0 28px #1f331a29; }
+.notes-confirm-overlay { position: fixed; inset: 0; z-index: 2600; background: #1f2d286b; }
+.notes-confirm-dialog { position: fixed; z-index: 2601; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; padding: 26px; border: 1px solid #fff; border-radius: 13px; background: #fbfbf8; color: #42563a; box-shadow: 0 22px 90px #19241642; font-family: Manrope, sans-serif; }
+.notes-confirm-dialog h2 { margin: 0 0 13px; font-size: 20px; line-height: 1.5; font-weight: 500; }
+.notes-confirm-dialog p { margin: 0; font-size: 12px; line-height: 1.9; overflow-wrap: anywhere; color: #5b6d51; }
+.notes-confirm-dialog button { cursor: pointer; font-size: 12px; min-height: 40px; }
+.notes-confirm-backup { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; color: #456534; padding: 9px 0; margin: 13px 0; text-decoration: underline; text-underline-offset: 4px; }
+.notes-confirm-actions { display: flex; gap: 9px; justify-content: flex-end; flex-wrap: wrap; }
+.notes-confirm-actions button { border: 1px solid #b9c8b0; border-radius: 6px; padding: 10px 12px; background: #f3f7ef; color: #456037; }
+.notes-confirm-actions .notes-confirm-delete { background: #884a39; color: #fff; border-color: #884a39; }
+@media (max-width: 720px) {
+  .studio-notes .studio-note-body { font-size: 16px; }
+  .studio-notes .notes-sidebar > header { padding: 16px 14px 14px; }
+  .studio-notes .notes-sidebar > header h2 { font-size: 23px; }
+  .studio-notes .notes-sidebar > header span { font-size: 8px; }
+  .studio-notes .notes-sidebar-actions { gap: 5px; }
+  .studio-notes .notes-sidebar-actions button { min-width: 38px; min-height: 38px; }
+  .studio-notes .notes-capacity-warning { align-items: flex-start; flex-direction: column; padding: 10px 15px; gap: 5px; }
+  .studio-notes .notes-sidebar > footer { padding: 11px 14px; }
+  .studio-notes .notes-section-heading { padding-top: 16px; }
+  .studio-notes .notes-trash-actions { padding-inline: 18px; }
+  .studio-notes .studio-note-editor > footer { flex-wrap: wrap; gap: 5px; }
+  .notes-confirm-dialog { padding: 22px 20px; }
+  .notes-confirm-actions { flex-direction: column; }
+}
+@media (pointer: coarse) {
+  .studio-notes .notes-sidebar-actions button,
+  .studio-notes .studio-note-editor > header button,
+  .studio-notes .notes-notice button,
+  .studio-notes .notes-search button { min-width: 44px; min-height: 44px; }
+  .studio-notes .notes-sidebar > footer button,
+  .studio-notes .notes-trash-actions button,
+  .studio-notes .notes-capacity-warning button,
+  .notes-confirm-dialog button { min-height: 44px; }
+}

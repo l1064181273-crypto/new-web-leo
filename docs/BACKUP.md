@@ -2,13 +2,15 @@
 
 ## 隔离目录
 
-- 旧站及上一轮修改：`/Users/bytedance/Desktop/Batydance/Trae develop/lhn`
-- 本轮新站：`/Users/bytedance/Desktop/Batydance/Trae develop/new-web-leo`
-- 备份目录：`/Users/bytedance/Desktop/Batydance/Trae develop/site-backups/20260909`
-- v3 备份目录：`/Users/bytedance/Desktop/Batydance/Trae develop/site-backups/20260910`
-- v10 备份目录：`/Users/bytedance/Desktop/Batydance/Trae develop/site-backups/20260911`
+- 旧站及上一轮修改：`<local-workspace>/lhn`
+- 本轮新站：`<local-workspace>/new-web-leo`
+- 备份目录：`<local-workspace>/site-backups/20260909`
+- v3 备份目录：`<local-workspace>/site-backups/20260910`
+- v10 备份目录：`<local-workspace>/site-backups/20260911`
 - 新站基线 commit：`4232d95`
 - 本轮工作分支：`feat/macxfolio-desktop`
+
+`<local-workspace>` 是维护者的本地工作目录占位，不是仓库路径。备份保留在本地，未随源码发布；恢复时使用实际保存位置。
 
 本轮未覆盖旧站，未对任何原始图片做裁剪或内容修改。原图保留在新站 `src/assets/` 中。
 备份在安装新站依赖、修改新站源代码之前完成。

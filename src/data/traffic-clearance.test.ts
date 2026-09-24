@@ -72,4 +72,32 @@ describe("Little Works static obstacle clearance", () => {
       expect(spoilMinZ - (path.toZ + loaderHalfLength)).toBeGreaterThan(0.005);
     }
   });
+
+  it("keeps the complete rotated truck footprint inside the original site boundary", () => {
+    let minimum = Infinity;
+    for (let time = 0; time < 120; time += .01) {
+      for (let truck = 0; truck < 3; truck++) {
+        const pose = vehiclePose(time, truck);
+        const extentX = Math.abs(Math.cos(pose.angle)) * truckHalfWidth + Math.abs(Math.sin(pose.angle)) * truckHalfLength;
+        const extentZ = Math.abs(Math.sin(pose.angle)) * truckHalfWidth + Math.abs(Math.cos(pose.angle)) * truckHalfLength;
+        minimum = Math.min(minimum, 13.45 - .2 - Math.abs(pose.position.x) - extentX, 9.75 - .1 - Math.abs(pose.position.z) - extentZ);
+      }
+    }
+    expect(minimum).toBeGreaterThan(.05);
+  });
+
+  it("preserves traffic-loop continuity and finite poses at negative and long-running clocks", () => {
+    for (const time of [-120000, -120, -.001, 0, 11.999, 12, 12.001, 59.99, 119.999, 120, 9999999]) {
+      for (let truck = 0; truck < 3; truck++) {
+        const pose = vehiclePose(time, truck);
+        const repeated = vehiclePose(time + 120, truck);
+        const next = vehiclePose(time + .001, truck);
+        expect([pose.position.x, pose.position.z, pose.angle, pose.tip].every(Number.isFinite)).toBe(true);
+        expect(pose.position.distanceTo(repeated.position)).toBeLessThan(1e-7);
+        expect(pose.position.distanceTo(next.position)).toBeLessThan(.002);
+        expect(pose.tip).toBeGreaterThanOrEqual(0);
+        expect(pose.tip).toBeLessThanOrEqual(.65);
+      }
+    }
+  });
 });

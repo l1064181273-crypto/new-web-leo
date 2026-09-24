@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studio V2 · Responsive QA</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #dfe7ed;
+        color: #304b60;
+        font:
+          13px system-ui,
+          sans-serif;
+      }
+      header {
+        padding: 18px 24px;
+        background: #f6f9fb;
+        border-bottom: 1px solid #c3d0dc;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      p {
+        font-size: 11px;
+        margin: 6px 0 0;
+        color: #607a8b;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      select,
+      button {
+        padding: 9px 12px;
+        border: 1px solid #bccbd5;
+        border-radius: 6px;
+        background: white;
+        color: inherit;
+        font: inherit;
+      }
+      main {
+        padding: 24px;
+        min-width: max-content;
+      }
+      iframe {
+        display: block;
+        box-sizing: content-box;
+        border: 1px solid #b8c9d5;
+        background: white;
+        box-shadow: 0 10px 35px #213b5620;
+      }
+      output {
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+      }
+      footer {
+        padding: 0 24px 24px;
+        font-size: 11px;
+        color: #637b8b;
+      }
+      details {
+        max-width: 960px;
+        margin: 0 24px 24px;
+        padding: 14px;
+        border: 1px solid #bccbd5;
+        border-radius: 6px;
+        background: #f6f9fb;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      pre {
+        margin-bottom: 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font:
+          12px/1.65 ui-monospace,
+          monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Studio V2 · 尺寸测试台</h1>
+        <p>仅开发环境使用。框内拥有独立、真实的 CSS 视口。</p>
+      </div>
+      <label
+        >测试尺寸
+        <select id="size">
+          <option value="320,740">窄屏 320 × 740</option>
+          <option value="390,844" selected>手机 390 × 844</option>
+          <option value="768,1024">平板 768 × 1024</option>
+          <option value="1024,768">小桌面 1024 × 768</option>
+          <option value="1440,900">桌面 1440 × 900</option>
+          <option value="1160,462">沙盘窗口 1160 × 462</option>
+        </select></label
+      >
+      <label
+        >测试内容
+        <select id="app">
+          <option value="profile" selected>Profile</option>
+          <option value="">桌面</option>
+          <option value="resume">Resume</option>
+          <option value="projects">Projects</option>
+          <option value="photos">Photography</option>
+          <option value="daily">Daybook</option>
+          <option value="music">Music</option>
+          <option value="cinema">Cinema</option>
+          <option value="food">Table Stories</option>
+          <option value="atlas">Personal Atlas</option>
+          <option value="notes">Field Notes</option>
+          <option value="connect">Connect</option>
+          <option value="source">GitHub</option>
+          <option value="cats">Little Works</option>
+          <option value="games">Herding Cats</option>
+          <option value="sandbox">独立沙盘</option>
+        </select></label
+      >
+      <button id="reload">重新载入预览</button
+      ><button id="inspect">检查当前页面</button
+      ><output id="dimensions">390 × 844</output>
+    </header>
+    <main>
+      <iframe
+        id="preview"
+        title="响应式网站预览"
+        width="390"
+        height="844"
+        src="about:blank"
+        allow="fullscreen"
+      ></iframe>
+    </main>
+    <footer>
+      本页不属于生产构建，不会替换主站入口。状态与同源本地预览共用，测试便签请用明确标记。
+    </footer>
+    <details id="report">
+      <summary>当前页面检查结果（只读）</summary>
+      <pre id="diagnostics" aria-live="polite">
+点击“检查当前页面”。这里只读取布局、图片与音频状态，不修改应用数据。</pre
+      >
+    </details>
+    <script type="module">
+      const frame = document.getElementById("preview");
+      const size = document.getElementById("size");
+      const app = document.getElementById("app");
+      const params = new URLSearchParams(location.search);
+      if (
+        Array.from(size.options).some(
+          (option) => option.value === params.get("size"),
+        )
+      )
+        size.value = params.get("size");
+      if (
+        Array.from(app.options).some(
+          (option) => option.value === params.get("app"),
+        )
+      )
+        app.value = params.get("app");
+      const remember = () => {
+        const query = new URLSearchParams({ size: size.value, app: app.value });
+        history.replaceState(null, "", `${location.pathname}?${query}`);
+      };
+      const update = () => {
+        const [width, height] = size.value.split(",");
+        frame.width = width;
+        frame.height = height;
+        document.getElementById("dimensions").textContent =
+          `${width} × ${height}`;
+        remember();
+      };
+      const navigate = () => {
+        frame.src =
+          app.value === "sandbox"
+            ? "/construction-sandbox.html?v=studio-v2"
+            : app.value
+              ? `/?app=${app.value}`
+              : "/";
+        remember();
+      };
+      size.addEventListener("change", update);
+      app.addEventListener("change", navigate);
+      document.getElementById("reload").addEventListener("click", navigate);
+      document.getElementById("inspect").addEventListener("click", () => {
+        const report = document.getElementById("report");
+        const output = document.getElementById("diagnostics");
+        try {
+          const win = frame.contentWindow;
+          const doc = frame.contentDocument;
+          if (!win || !doc?.body) throw new Error("预览尚未载入。");
+          const bounds = (element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              left: Math.round(rect.left),
+              right: Math.round(rect.right),
+            };
+          };
+          const shown = (element) =>
+            element.getClientRects().length > 0 &&
+            !element.closest('[hidden], [inert], [aria-hidden="true"]');
+          const file = (url) => {
+            try {
+              return new URL(url, location.href).pathname.split("/").pop();
+            } catch {
+              return url;
+            }
+          };
+          const viewport = {
+            width: win.innerWidth,
+            height: win.innerHeight,
+            devicePixelRatio: win.devicePixelRatio,
+          };
+          const appWindow = doc.querySelector(
+            '.desktop-window[aria-hidden="false"], .desktop-window:not([aria-hidden]), [role="dialog"]',
+          );
+          const focused = doc.activeElement;
+          const images = [...doc.images]
+            .filter(shown)
+            .map((img) => ({
+              alt: img.alt,
+              ...bounds(img),
+              natural: [img.naturalWidth, img.naturalHeight],
+              loaded: img.complete && img.naturalWidth > 0,
+              resource: file(img.currentSrc || img.src),
+            }));
+          const containers = [
+            ...doc.querySelectorAll(
+              ".window-body, .studio-profile, .studio-workshop, .workshop-main, .music-studio, .ipod, .garden-board, .studio-note-title, .studio-note-body",
+            ),
+          ]
+            .filter(shown)
+            .map((element) => ({
+              name: element.className,
+              ...bounds(element),
+              scrollWidth: element.scrollWidth,
+              clientWidth: element.clientWidth,
+              overflowX: win.getComputedStyle(element).overflowX,
+              fontSize: win.getComputedStyle(element).fontSize,
+            }));
+          const audio = [...doc.querySelectorAll("audio")].map((element) => ({
+            paused: element.paused,
+            ended: element.ended,
+            time: Math.round(element.currentTime * 10) / 10,
+            duration: Number.isFinite(element.duration)
+              ? Math.round(element.duration * 10) / 10
+              : null,
+            readyState: element.readyState,
+            networkState: element.networkState,
+            attachedSource: Boolean(element.getAttribute("src")),
+            resource: file(element.currentSrc || element.src),
+            volume: element.volume,
+          }));
+          output.textContent = JSON.stringify(
+            {
+              title: doc.title,
+              viewport,
+              documentWidth: doc.documentElement.scrollWidth,
+              horizontalPageOverflow:
+                doc.documentElement.scrollWidth > win.innerWidth + 1,
+              activeWindow: appWindow ? bounds(appWindow) : null,
+              focus: focused
+                ? {
+                    tag: focused.tagName,
+                    label:
+                      focused.getAttribute("aria-label") ||
+                      focused.textContent?.trim().slice(0, 80),
+                    inertAncestor: Boolean(focused.closest("[inert]")),
+                  }
+                : null,
+              containers,
+              images,
+              audio,
+            },
+            null,
+            2,
+          );
+        } catch (error) {
+          output.textContent = `暂时无法检查：${error instanceof Error ? error.message : "请等预览载入后再试。"}`;
+        }
+        report.open = true;
+      });
+      update();
+      navigate();
+    </script>
+  </body>
+</html>

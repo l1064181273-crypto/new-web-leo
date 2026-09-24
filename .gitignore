@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Local credentials; commit only explicitly sanitized example templates.
+.env
+.env.*
+!.env.example
+!.env.*.example
+# Root-level credential files only; do not hide nested fixtures or app assets.
+/*.pem
+/*.key
+/*.p12
+/*.pfx
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -28,3 +39,9 @@ artifacts/
 playwright-report/
 test-results/
 deliverables/
+
+# Local task journals and handoff records are retained on disk, not published.
+/docs/V2_PLAN.md
+/docs/ITERATION_LOG.md
+/docs/QA_MATRIX.md
+/docs/STUDIO-V2-HANDOFF.md

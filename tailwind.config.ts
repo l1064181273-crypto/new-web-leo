@@ -9,8 +9,7 @@ export default {
     "./src/pages/Index.tsx",
     "./src/pages/DesktopNotFound.tsx",
     "./src/components/desktop/**/*.{ts,tsx}",
-    "./src/components/PortfolioDesk.tsx",
-    "./src/components/ui/**/*.{ts,tsx}",
+    "./src/components/cat-game/**/*.{ts,tsx}",
   ],
   prefix: "",
   theme: {

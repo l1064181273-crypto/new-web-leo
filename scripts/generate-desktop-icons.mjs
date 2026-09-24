@@ -1,5 +1,12 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
+
+// Optional historical asset generator; npm ci, dev and build do not invoke it.
+// Existing icon assets are committed and need no image service to build.
+// Manual use requires an explicitly selected, compatible HTTPS endpoint in
+// LEO_ICON_IMAGE_ENDPOINT. Protocol: GET ?prompt=...&image_size=square, with raw
+// image bytes in the response. Credentials and query parameters are not accepted
+// in the endpoint URL. No default endpoint or service authorization is provided.
 const subjects = {
   daily:
     "an elegant ivory travel journal with a tiny coral bookmark and embossed sunrise symbol, on a deep emerald green badge",
@@ -20,10 +27,25 @@ const common =
   "Premium macOS desktop app icon, realistic high-end 3D product render, front-facing centered composition, a single rounded square enamel badge filling the entire square image edge to edge, rounded corners, tactile ceramic and glass material, fine beveled edges, gentle studio lighting from top left, subtle ambient occlusion, crisp silhouette readable at 64 pixels, minimalist crafted design, no text, no letters, no watermark, no photography, no extra objects outside badge. ";
 const pendingHash =
   "e330cd023298a812503e10a067a3f88e1cbc094f37f6fd2a88fdb6799495b37e";
+const requested = process.argv.slice(2);
+if (!requested.length) throw new Error("Provide one or more icon names for this optional historical generator.");
+for (const name of requested) {
+  if (!Object.hasOwn(subjects, name)) throw new Error(`Unknown icon ${name}`);
+}
+const configuredEndpoint = process.env.LEO_ICON_IMAGE_ENDPOINT;
+if (!configuredEndpoint) throw new Error("Optional generator disabled: set LEO_ICON_IMAGE_ENDPOINT to a compatible HTTPS image service before running it.");
+let endpoint;
+try {
+  endpoint = new URL(configuredEndpoint);
+} catch {
+  throw new Error("LEO_ICON_IMAGE_ENDPOINT must be a valid HTTPS URL.");
+}
+if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+  throw new Error("LEO_ICON_IMAGE_ENDPOINT must use HTTPS and contain no credentials, query parameters or fragment.");
+}
 await mkdir("public/desktop/designed", { recursive: true });
 await mkdir("artifacts/interaction-v2/icon-sources", { recursive: true });
-for (const name of process.argv.slice(2)) {
-  if (!subjects[name]) throw new Error(`Unknown icon ${name}`);
+for (const name of requested) {
   const destination = `public/desktop/designed/${name}.png`;
   try {
     const current = await readFile(destination);
@@ -35,14 +57,14 @@ for (const name of process.argv.slice(2)) {
     /* New icon. */
   }
   const prompt = common + subjects[name];
-  const url = `https://copilot-cn.bytedance.net/api/ide/v1/text_to_image?prompt=${encodeURIComponent(prompt)}&image_size=square`;
+  const url = new URL(endpoint);
+  url.searchParams.set("prompt", prompt);
+  url.searchParams.set("image_size", "square");
   const response = await fetch(url, { signal: AbortSignal.timeout(180000) });
   if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
   const data = Buffer.from(await response.arrayBuffer());
   if (!response.headers.get("content-type")?.startsWith("image/")) {
-    throw new Error(
-      `${name}: expected image, got ${data.toString("utf8").slice(0, 400)}`,
-    );
+    throw new Error(`${name}: expected an image response; response body omitted.`);
   }
   if (createHash("sha256").update(data).digest("hex") === pendingHash) {
     console.log(`${name}: generation pending`);
@@ -54,7 +76,7 @@ for (const name of process.argv.slice(2)) {
     JSON.stringify(
       {
         prompt,
-        url,
+        source: "Explicitly configured LEO_ICON_IMAGE_ENDPOINT",
         bytes: data.length,
         sha256: createHash("sha256").update(data).digest("hex"),
       },

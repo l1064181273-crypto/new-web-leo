@@ -1,0 +1,20 @@
+/* This frame must work when the sandbox is the first app opened. It cannot
+   depend on a stylesheet owned by a lazily loaded collection app. */
+.sandbox-app {
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  background: #1e2630;
+}
+
+.sandbox-app iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.window-inner.app-cats .window-content {
+  padding: 0;
+  background: #1d2630;
+}

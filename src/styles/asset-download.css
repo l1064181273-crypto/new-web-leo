@@ -1,0 +1,7 @@
+.asset-download-feedback { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; min-width: 0; padding: 8px 14px; background: #243640; color: #e0edf2; font-size: 11px; line-height: 1.7; }
+.asset-download-feedback[data-status="error"] { background: #513b30; color: #ffe7ce; }
+.asset-download-feedback p { flex: 1 1 180px; margin: 0; }
+.asset-download-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.asset-download-feedback a, .asset-download-feedback button { display: inline-flex; align-items: center; min-height: 32px; padding: 0; background: none; border: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.asset-download-feedback :focus-visible { outline: 2px solid #98c9ef; outline-offset: 3px; }
+.collection-viewer-note .asset-download-feedback { margin-top: 8px; border-radius: 8px; }

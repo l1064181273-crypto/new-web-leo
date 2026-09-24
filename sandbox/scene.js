@@ -1,17 +1,51 @@
 import * as THREE from "three-r160";
 import { OrbitControls } from "three-r160/examples/jsm/controls/OrbitControls.js";
 import { lampPositions, loaderPaths, vehiclePose } from "./traffic.js";
+import { createFrameSampler } from "./performance.js";
+import { EXPANSION_DISTRICTS } from "./site-expansion.js";
+import { createOfficeBuilding } from "./office-building.js";
+import { BUILD_CHAPTERS, BUILD_CYCLE_SECONDS, BUILD_GROW_END, BUILD_RESET_START, CAMERA_NAMES, DEFAULT_SETTINGS, EQUIPMENT, OBSERVATION_KEY, OBSERVATION_TIMELINE, OBSERVATION_VERSION, SITE_ZONES, constructionAt, formatSceneTime, getChapter, getQualityProfile, getSceneFov, getSceneMinute, normalizeSettings, readObservation } from "./studio-state.js";
 
 const canvas = document.querySelector("#scene");
 const errorBox = document.querySelector("#scene-error");
 const query = new URLSearchParams(location.search);
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const $ = selector => document.querySelector(selector);
+let sceneStatus = "loading";
+function reportToDesktop(type) {
+  if (type === "little-works-ready") sceneStatus = "ready";
+  if (type === "little-works-error") sceneStatus = "error";
+  if (parent !== window) parent.postMessage({ type }, location.origin === "null" ? "*" : location.origin);
+}
+window.addEventListener("message", event => {
+  if (event.source !== parent || (location.origin !== "null" && event.origin !== location.origin) || event.data?.type !== "little-works-status-request") return;
+  if (sceneStatus !== "loading") reportToDesktop(`little-works-${sceneStatus}`);
+});
+function showSceneError(message) {
+  const restoreFocus = errorBox.contains(document.activeElement);
+  errorBox.hidden = false;
+  errorBox.replaceChildren(document.createTextNode(message));
+  const retry = document.createElement("button");
+  retry.textContent = "重新载入沙盘";
+  retry.addEventListener("click", () => location.reload());
+  errorBox.append(retry);
+  if (restoreFocus) retry.focus({ preventScroll: true });
+  reportToDesktop("little-works-error");
+}
+function showSceneReady() {
+  if (sceneStatus === "ready") return;
+  const restoreFocus = errorBox.contains(document.activeElement);
+  errorBox.hidden = true;
+  if (restoreFocus) canvas.focus({ preventScroll: true });
+  reportToDesktop("little-works-ready");
+}
 const SITE_LAYOUT = {
-  previousWidth: 22.5,
-  previousDepth: 16.5,
-  width: 27.5,
-  depth: 20.25,
-  fenceHalfX: 13.45,
-  fenceHalfZ: 9.75,
+  previousWidth: 27.5,
+  previousDepth: 20.25,
+  width: 31.5,
+  depth: 24.25,
+  fenceHalfX: 15.45,
+  fenceHalfZ: 11.75,
 };
 SITE_LAYOUT.previousArea =
   SITE_LAYOUT.previousWidth *
@@ -23,20 +57,27 @@ SITE_LAYOUT.expansionFactor =
   SITE_LAYOUT.area /
   SITE_LAYOUT.previousArea;
 const state = {
-  speed: 1,
-  paused: false,
-  cycle: true,
-  time: .5,
-  dust: .5,
-  rain: false,
-  camera: "overview",
-  buildMode: "auto",
-  manualBuild: .08,
+  ...DEFAULT_SETTINGS,
+  paused: reducedMotion.matches,
+  cycle: !reducedMotion.matches,
   buildProgress: 0,
   buildPhase: "基坑与测量",
   resetTransition: 0,
   externalPause: false,
+  contextLost: false,
+  renderFailed: false,
 };
+if (query.has("build") && Number.isFinite(Number(query.get("build")))) {
+  state.buildMode = "manual";
+  state.manualBuild = Math.max(0, Math.min(1, Number(query.get("build"))));
+}
+if (query.has("time") && Number.isFinite(Number(query.get("time")))) {
+  state.time = normalizeSettings({ time: Number(query.get("time")) }).time;
+  state.cycle = false;
+}
+if (CAMERA_NAMES.includes(query.get("view")) && query.get("view") !== "custom") state.camera = query.get("view");
+if (["auto", "high", "low"].includes(query.get("quality"))) state.quality = query.get("quality");
+if (query.get("rain") === "1") state.rain = true;
 const metrics = {
   revision: THREE.REVISION,
   fps: 0,
@@ -95,27 +136,38 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance", preserveDrawingBuffer: query.has("capture") });
 } catch {
-  errorBox.hidden = false;
-  errorBox.textContent = "此设备无法启动 WebGL。请使用支持硬件加速的 Chrome 打开沙盘。";
+  showSceneError("这台设备暂时无法启动三维场景。可以开启浏览器硬件加速后重试，或换用支持 WebGL 的浏览器。");
 }
-if (renderer) initialize();
+if (renderer) {
+  try { initialize(); } catch (error) {
+    showSceneError("沙盘未能完成载入。请重新载入；如果持续出现，可以从桌面右上角独立打开沙盘再试。");
+    console.error("Little Works initialization failed:", error);
+  }
+}
 
 function initialize() {
-  renderer.setPixelRatio(Math.min(devicePixelRatio, innerWidth < 650 ? 1.3 : 1.6));
+  const initialQuality = getQualityProfile(state.quality, innerWidth, devicePixelRatio);
+  renderer.setPixelRatio(initialQuality.ratio);
   renderer.setSize(innerWidth, innerHeight);
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = initialQuality.shadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.25;
+  // r160 normally clears render.info after the shadow pass. Reset explicitly
+  // before the whole frame so the visible diagnostics include that cost too.
+  renderer.info.autoReset = false;
+  const frameSampler = createFrameSampler();
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#2c3541");
-  scene.fog = new THREE.FogExp2("#2c3541", .012);
-  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, .1, 160);
+  scene.fog = new THREE.FogExp2("#2c3541", innerWidth / innerHeight < .75 ? .009 : .012);
+  const camera = new THREE.PerspectiveCamera(getSceneFov(innerWidth, innerHeight), innerWidth / innerHeight, .1, 160);
   const desktopPosition = new THREE.Vector3(34, 16, 39);
-  const mobilePosition = new THREE.Vector3(50, 25, 58);
+  const compactPosition = new THREE.Vector3(27, 14, 32);
+  const mobilePosition = new THREE.Vector3(38, 46, 44);
+  const overviewPosition = () => innerWidth / innerHeight < .75 ? mobilePosition : innerHeight < 560 && innerWidth / innerHeight > 1.45 ? compactPosition : desktopPosition;
   const resetCamera = () => {
-    camera.position.copy(innerWidth / innerHeight < .75 ? mobilePosition : desktopPosition);
+    camera.position.copy(overviewPosition());
     controls?.target.set(0, 1.1, 0);
   };
   let controls;
@@ -126,7 +178,7 @@ function initialize() {
   controls.dampingFactor = .06;
   controls.minDistance = 8;
   controls.maxDistance = 72;
-  controls.minPolarAngle = .55;
+  controls.minPolarAngle = .12;
   controls.maxPolarAngle = Math.PI / 2 - .09;
   controls.enablePan = false;
   controls.autoRotateSpeed = .17;
@@ -145,20 +197,56 @@ function initialize() {
       mobilePosition: new THREE.Vector3(-1, 4.8, 17),
       target: new THREE.Vector3(-.5, .45, 2.3),
     },
+    excavation: { position: new THREE.Vector3(-14, 13, -10), mobilePosition: new THREE.Vector3(-19, 18, -15), target: new THREE.Vector3(-4.5, .25, -.8) },
+    structure: { position: new THREE.Vector3(17, 9.5, 14), mobilePosition: new THREE.Vector3(22, 14, 22), target: new THREE.Vector3(4.5, 2, -1.55) },
+    finished: { position: new THREE.Vector3(13.8, 8.7, 11.4), mobilePosition: new THREE.Vector3(11.2, 8.6, 9.8), target: new THREE.Vector3(4.5, 2.8, -.95) },
+    rebar: { position: new THREE.Vector3(-11, 6.2, 12), mobilePosition: new THREE.Vector3(-14, 9, 17), target: new THREE.Vector3(-4.5, .65, 3.4) },
+    office: { position: new THREE.Vector3(-8, 5.5, 7), mobilePosition: new THREE.Vector3(-9, 9, 15), target: new THREE.Vector3(0, .9, -4.25) },
+    logistics: { position: new THREE.Vector3(-22, 7, 10), mobilePosition: new THREE.Vector3(-25, 11, 15), target: new THREE.Vector3(-11.75, .6, -.25) },
+    utilities: { position: new THREE.Vector3(9, 10, 22), mobilePosition: new THREE.Vector3(12, 15, 26), target: new THREE.Vector3(0, .4, 8.72) },
+    precast: { position: new THREE.Vector3(23, 8, 13), mobilePosition: new THREE.Vector3(28, 13, 20), target: new THREE.Vector3(11.75, .9, .35) },
+    loader: { position: new THREE.Vector3(15, 7, 9), mobilePosition: new THREE.Vector3(19, 10, 14), target: new THREE.Vector3(7.12, .45, 1.1) },
+    entrance: { position: new THREE.Vector3(-15, 8, 21), mobilePosition: new THREE.Vector3(-19, 12, 26), target: new THREE.Vector3(-8.4, .6, 9.5) },
+    materials: { position: new THREE.Vector3(-16, 8, 2), mobilePosition: new THREE.Vector3(-21, 12, 8), target: new THREE.Vector3(-9.6, .6, -9.5) },
+    welfare: { position: new THREE.Vector3(10, 6, 2), mobilePosition: new THREE.Vector3(15, 10, 9), target: new THREE.Vector3(8.1, .9, -9.8) },
+    plan: { position: new THREE.Vector3(0, 40, 5), mobilePosition: new THREE.Vector3(0, 56, 7), target: new THREE.Vector3(0, .5, 0) },
   };
   let cameraTransition = null;
+  function clearCameraInertia() {
+    // OrbitControls retains drag deltas even after assigning a saved pose. Drain
+    // them without rendering the intermediate position, then restore this pose.
+    const position = camera.position.clone(), target = controls.target.clone();
+    const damping = controls.enableDamping;
+    controls.autoRotate = false;
+    controls.enableDamping = false;
+    controls.update();
+    camera.position.copy(position); controls.target.copy(target);
+    controls.update();
+    controls.enableDamping = damping;
+  }
   function setCameraPreset(name) {
+    if (name !== "overview" && !cameraViews[name]) return;
+    clearCameraInertia();
     state.camera = name;
+    $("#camera-view").value = name;
     const view = name === "overview"
       ? {
-          position: innerWidth / innerHeight < .75 ? mobilePosition : desktopPosition,
+          position: overviewPosition(),
           target: new THREE.Vector3(0, 1.1, 0),
         }
       : cameraViews[name];
     const position =
       innerWidth / innerHeight < .75 && view.mobilePosition
         ? view.mobilePosition
-        : view.position;
+      : view.position;
+    lastInteraction = performance.now();
+    if (reducedMotion.matches) {
+      camera.position.copy(position);
+      controls.target.copy(view.target);
+      cameraTransition = null;
+      controls.update();
+      return;
+    }
     cameraTransition = {
       fromPosition: camera.position.clone(),
       fromTarget: controls.target.clone(),
@@ -168,14 +256,20 @@ function initialize() {
     };
   }
   let lastInteraction = performance.now();
-  controls.addEventListener("start", () => { lastInteraction = performance.now(); cameraTransition = null; controls.autoRotate = false; });
+  controls.addEventListener("start", () => {
+    lastInteraction = performance.now();
+    cameraTransition = null;
+    controls.autoRotate = false;
+    state.camera = "custom";
+    $("#camera-view").value = "custom";
+  });
   controls.addEventListener("end", () => { lastInteraction = performance.now(); });
 
   const hemi = new THREE.HemisphereLight("#d5edff", "#6b4935", 2.3);
   const sun = new THREE.DirectionalLight("#fff3d6", 3.7);
   sun.position.set(-10, 23, 15);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(1536, 1536);
+  sun.shadow.mapSize.set(initialQuality.shadowSize, initialQuality.shadowSize);
   Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 20, bottom: -20, near: 1, far: 70 });
   sun.shadow.normalBias = .06;
   sun.shadow.bias = -.0002;
@@ -187,11 +281,11 @@ function initialize() {
   moon.position.set(10, 15, -12);
   scene.add(fill, moon);
   const lightingStops = [
-    { at: 0, name: "夜晚", sky: "#081326", fog: "#0d1a2e", sun: "#7f9fd0", sunPower: .04, hemi: .34, fill: .18, moon: 1.15, lamps: 1, exposure: .9 },
+    { at: 0, name: "夜晚", sky: "#081326", fog: "#0d1a2e", sun: "#7f9fd0", sunPower: .04, hemi: .48, fill: .26, moon: 1.15, lamps: 1, exposure: .97 },
     { at: .25, name: "黎明", sky: "#b36a73", fog: "#8a6470", sun: "#ffad6f", sunPower: 2.15, hemi: 1.05, fill: .42, moon: .15, lamps: .42, exposure: 1.04 },
     { at: .5, name: "正午", sky: "#6f9fbd", fog: "#7798a8", sun: "#fff0d0", sunPower: 4.15, hemi: 2.35, fill: 1.1, moon: 0, lamps: 0, exposure: 1.18 },
-    { at: .75, name: "黄昏", sky: "#884b61", fog: "#69465b", sun: "#ff8552", sunPower: 1.7, hemi: .78, fill: .32, moon: .32, lamps: .72, exposure: 1 },
-    { at: 1, name: "夜晚", sky: "#081326", fog: "#0d1a2e", sun: "#7f9fd0", sunPower: .04, hemi: .34, fill: .18, moon: 1.15, lamps: 1, exposure: .9 },
+    { at: .75, name: "黄昏", sky: "#884b61", fog: "#69465b", sun: "#ff8552", sunPower: 1.7, hemi: 1.02, fill: .5, moon: .32, lamps: .72, exposure: 1.07 },
+    { at: 1, name: "夜晚", sky: "#081326", fog: "#0d1a2e", sun: "#7f9fd0", sunPower: .04, hemi: .48, fill: .26, moon: 1.15, lamps: 1, exposure: .97 },
   ].map(stop => ({
     ...stop,
     sky: new THREE.Color(stop.sky),
@@ -277,6 +371,10 @@ function initialize() {
     mesh.instanceMatrix.needsUpdate = true;
     mesh.castShadow = shadow;
     mesh.receiveShadow = true;
+    // Bounds must describe the complete model before stage animations shrink it.
+    // Otherwise r160 can cache a tiny first-frame bound and cull later floors.
+    mesh.computeBoundingBox();
+    mesh.computeBoundingSphere();
     parent.add(mesh);
     metrics.instances += entries.length;
     return mesh;
@@ -331,21 +429,21 @@ function initialize() {
   const woodTexture = new THREE.CanvasTexture(woodCanvas);
   woodTexture.colorSpace = THREE.SRGBColorSpace; woodTexture.wrapS = woodTexture.wrapT = THREE.RepeatWrapping; woodTexture.repeat.set(2, 3);
   const woodMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: .44, metalness: .07 });
-  meshBox(scene, 0, -1.28, 0, 36.5, .75, 29, woodMat);
-  meshBox(scene, 0, -1.72, 0, 35.6, .14, 28.1, new THREE.MeshStandardMaterial({ color: "#201c1a", roughness: .6 }));
+  meshBox(scene, 0, -1.28, 0, 40.5, .75, 33, woodMat);
+  meshBox(scene, 0, -1.72, 0, 39.6, .14, 32.1, new THREE.MeshStandardMaterial({ color: "#201c1a", roughness: .6 }));
   const room = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshStandardMaterial({ color: "#262a32", roughness: .9 }));
   room.rotation.x = -Math.PI / 2; room.position.y = -6; room.receiveShadow = true; scene.add(room);
   box(terrain, 0, -.68, 0, SITE_LAYOUT.width, .38, SITE_LAYOUT.depth, "#47515b");
-  box(terrain, 0, -.46, 0, 27.1, .15, 19.85, "#b09b69");
+  box(terrain, 0, -.46, 0, SITE_LAYOUT.width - .4, .15, SITE_LAYOUT.depth - .4, "#b09b69");
   // Four slabs leave a real opening for the excavation; no painted hole or overlapping ground.
   box(terrain, -9.1, -.18, 0, 3.8, .4, 16, "#b8a477");
   box(terrain, 4.6, -.18, 0, 12.8, .4, 16, "#b5a078");
   box(terrain, -4.5, -.18, -5.5, 5.4, .4, 5, "#bba67b");
   box(terrain, -4.5, -.18, 4.7, 5.4, .4, 6.6, "#b09b6e");
-  box(terrain, 0, -.18, 8.98, 27.1, .4, 1.85, "#ad9c75");
-  box(terrain, 0, -.18, -8.98, 27.1, .4, 1.85, "#b6a37c");
-  box(terrain, -12.3, -.18, 0, 2.5, .4, 16.1, "#ae9a70");
-  box(terrain, 12.3, -.18, 0, 2.5, .4, 16.1, "#b7a77f");
+  box(terrain, 0, -.18, 9.9625, 31.1, .4, 3.925, "#ad9c75");
+  box(terrain, 0, -.18, -9.9625, 31.1, .4, 3.925, "#b6a37c");
+  box(terrain, -13.275, -.18, 0, 4.55, .4, 16, "#ae9a70");
+  box(terrain, 13.275, -.18, 0, 4.55, .4, 16, "#b7a77f");
   box(terrain, -4.5, -.51, -.8, 5.4, .06, 4.4, "#6f5841");
   for (let i = 0; i < 130; i++) {
     box(terrain, -7.05 + random() * 5.1, -.41, -2.86 + random() * 4.08, .19 + random() * .2, .15, .2 + random() * .2, ["#7f6749", "#977753", "#aa8b63"][i % 3]);
@@ -359,109 +457,141 @@ function initialize() {
     box(terrain, -1.81, -.2, -2.9 + i * .2, .1, .6, .15, "#81664b");
   }
   const roadMaterial = new THREE.MeshStandardMaterial({ color: "#65696a", roughness: .95, metalness: .03 });
-  meshBox(scene, 0, .012, -5.9, 19.5, .025, 2, roadMaterial);
-  meshBox(scene, 0, .012, 5.7, 19.5, .025, 2, roadMaterial);
-  meshBox(scene, -8.85, .012, -.1, 2.05, .025, 10.2, roadMaterial);
-  meshBox(scene, 8.85, .012, -.1, 2.05, .025, 10.2, roadMaterial);
+  const roads = [];
+  box(roads, 0, .012, -5.9, 19.5, .025, 2, "#ffffff");
+  box(roads, 0, .012, 5.7, 19.5, .025, 2, "#ffffff");
+  box(roads, -8.85, .012, -.1, 2.05, .025, 10.2, "#ffffff");
+  box(roads, 8.85, .012, -.1, 2.05, .025, 10.2, "#ffffff");
+  // A flush entrance apron visibly joins the loop. The existing fleet stays on
+  // its established circuit; these facilities do not imply a new driving route.
+  box(roads, -6.95, .012, 9.225, 2.8, .025, 5.05, "#ffffff");
+  batch(scene, roads, roadMaterial).name = "site-roads";
   for (let i = -8; i <= 8; i += 1.2) for (const z of [-5.9, 5.7]) box(terrain, i, .031, z, .55, .009, .055, "#e4d4a8");
   for (let i = -4.8; i < 5; i += 1.2) for (const x of [-8.85, 8.85]) box(terrain, x, .031, i, .055, .009, .55, "#e4d4a8");
   groundSign("SERVICE LOOP  /  KEEP CLEAR", 3.6, 5.7, 4.2);
 
+  // A continuous green pedestrian route uses the newly gained outer shoulder.
+  // Paint is flush; nothing is placed in the vehicle swept envelope.
+  box(terrain, -14.2, .026, 2.05, .78, .009, 19.4, "#66887f");
+  box(terrain, -.13, .026, -7.6, 27.36, .009, .65, "#66887f");
+  box(terrain, 8.1, .037, -8.34, .85, .004, 1.18, "#66887f");
+  for (let z = -6.8; z < 11; z += 1.4)
+    box(terrain, -14.2, .033, z, .085, .004, .38, "#e6e7d7");
+  for (const x of [-8.26, -5.64]) box(terrain, x, .03, 9.24, .055, .008, 4.92, "#e6b747");
+  for (let i = 0; i < 7; i++) box(terrain, -8.08 + i * .37, .034, 7.4, .19, .008, .6, "#e3dfc9");
+  // Two shallow drainage runs, independent of the active excavation.
+  for (const x of [-15.1, 15.1]) box(terrain, x, .023, 0, .13, .006, 22.4, "#526668");
+
   const fenceColors = ["#80a8a8", "#e8dbb8", "#8fa1a7"];
-  for (let i = 0; i < 54; i++) {
-    const x = -13.25 + i * .5;
+  for (let i = 0; i < 62; i++) {
+    const x = -15.25 + i * .5;
     for (const z of [-SITE_LAYOUT.fenceHalfZ, SITE_LAYOUT.fenceHalfZ]) {
       if (z > 0 && x > -8.5 && x < -5.5) continue;
+      if (z > 0 && x >= -14.75 && x <= -13.75) continue;
       box(terrain, x, .48, z, .47, .94, .09, fenceColors[Math.floor(i / 8) % 3]);
       box(terrain, x, .97, z, .5, .055, .12, "#dfded1");
     }
   }
-  for (let i = 0; i < 39; i++) for (const x of [-SITE_LAYOUT.fenceHalfX, SITE_LAYOUT.fenceHalfX]) {
-    box(terrain, x, .48, -9.5 + i * .5, .09, .94, .47, fenceColors[Math.floor(i / 8) % 3]);
+  for (let i = 0; i < 47; i++) for (const x of [-SITE_LAYOUT.fenceHalfX, SITE_LAYOUT.fenceHalfX]) {
+    box(terrain, x, .48, -11.5 + i * .5, .09, .94, .47, fenceColors[Math.floor(i / 8) % 3]);
   }
+  for (const x of [-14.95, -13.55]) box(terrain, x, .79, 11.75, .12, 1.58, .12, "#496d80");
+  box(terrain, -14.25, 1.57, 11.75, 1.52, .15, .17, "#e6b747");
   for (const x of [-8.6, -5.3]) { box(terrain, x, 1.1, SITE_LAYOUT.fenceHalfZ, .2, 2.2, .2, "#344b57"); }
   box(terrain, -6.95, 2.15, SITE_LAYOUT.fenceHalfZ, 3.5, .42, .22, "#385766");
   sign("LITTLE WORKS  /  SITE 001", -6.95, 2.17, SITE_LAYOUT.fenceHalfZ + .14, 3.2, .31, 0, "#e9c15b");
   sign("HARD HAT AREA", 7.4, .66, SITE_LAYOUT.fenceHalfZ + .07, 2.5, .5, 0, "#e5cb70");
 
-  // In-progress concrete frame, scaffold, rebar, stairs and an active foundation bay.
+  // One building grows from a frame into a finished office. Each material is one
+  // shared-geometry batch; small interior/roof details are omitted in distant views.
   const building = new THREE.Group(); building.position.set(4.5, 0, -1.55); scene.add(building);
-  const structure = [];
-  const buildBox = (x, y, z, w, h, d, c, stage, removeAt = 2, ry = 0, rx = 0, rz = 0) =>
-    structure.push({ x, y, z, w, h, d, c, stage, removeAt, ry, rx, rz });
-  buildBox(0, .13, 0, 4.6, .22, 4.4, "#acaca1", .14);
-  for (let level = 0; level < 3; level++) {
-    const y = .35 + level * 1.65;
-    const stage = .24 + level * .17;
-    for (const x of [-1.8, 0, 1.8]) for (const z of [-1.7, 0, 1.7]) {
-      buildBox(x, y + .73, z, .24, 1.45, .24, "#bbbcb3", stage);
-      if (level === 2) for (let k = 0; k < 4; k++)
-        buildBox(x + (k % 2 ? .065 : -.065), y + 1.66, z + (k > 1 ? .065 : -.065), .035, .45, .035, "#4d4f4c", .72);
-    }
-    buildBox(0, y + 1.49, 0, 4.5, .15, 4.2, level === 2 ? "#b7bbb5" : "#bec0b6", stage + .11);
-    for (const x of [-1.8, 0, 1.8])
-      buildBox(x, y + 1.38, 0, .23, .25, 3.6, "#a8aca5", stage + .07);
-    for (const z of [-1.7, 0, 1.7])
-      buildBox(0, y + 1.38, z, 3.7, .25, .23, "#b6b7ad", stage + .07);
-    for (let x = -1.9; x <= 2; x += .4) {
-      buildBox(x, y + 1.62, 2.03, .08, .45, .08, "#e7b440", stage + .12, .9);
-      buildBox(x, y + 1.88, 2.03, .38, .045, .045, "#d79b31", stage + .12, .9);
-    }
-  }
-  for (let z = -2.2; z <= 2.3; z += .55) {
-    for (const x of [-2.45, 2.45]) {
-      buildBox(x, 2.7, z, .048, 5.4, .048, "#798b90", .28, .91);
-      for (let y = .7; y < 5.2; y += 1.1) {
-        const scaffoldStage = .3 + y / 5.2 * .42;
-        buildBox(x, y, z, .65, .08, .5, "#b8a782", scaffoldStage, .91);
-        buildBox(x, y + .4, z + .23, .038, .86, .038, "#92a3a8", scaffoldStage, .91, 0, .6);
-      }
-    }
-  }
-  for (let i = 0; i < 11; i++)
-    buildBox(-1.1, .36 + i * .15, -.9 + i * .19, .72, .14, .2, "#a3a59e", .34 + i * .012);
-  for (let level = 0; level < 3; level++) {
-    const wallY = .95 + level * 1.65;
-    const finishStage = .78 + level * .035;
-    for (const x of [-1.2, 0, 1.2]) {
-      buildBox(x, wallY, -1.78, 1.05, 1.08, .11, "#d7ddda", finishStage);
-      buildBox(x, wallY, 1.78, 1.05, .72, .08, "#668f9b", finishStage + .015);
-    }
-    for (const z of [-1.05, .1, 1.05]) {
-      buildBox(-1.88, wallY, z, .11, 1.08, .95, "#d1d8d5", finishStage + .01);
-      buildBox(1.88, wallY, z, .11, 1.08, .95, "#d1d8d5", finishStage + .01);
-    }
-  }
-  for (const x of [-1.85, 1.85]) for (const z of [-1.75, 0, 1.75])
-    buildBox(x, 5.35, z, .16, .45, .16, "#d8d8ce", .88);
-  const buildingMesh = batch(building, structure);
-  buildingMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const permanentStructureCount = structure.filter(entry => entry.removeAt >= 2).length;
+  const officeModel = createOfficeBuilding();
+  const officeGlassMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: .26, metalness: .32 });
+  const officeNightMaterial = new THREE.MeshBasicMaterial({ color: "#ffffff", toneMapped: false });
+  const officeBatches = [
+    ["structure", roughMaterial, true],
+    ["facade", roughMaterial, true],
+    ["glazing", officeGlassMaterial, false],
+    ["details", roughMaterial, false],
+    ["nightWindows", officeNightMaterial, false],
+  ].map(([key, material, shadows]) => {
+    const entries = officeModel[key];
+    const mesh = batch(building, entries, material, shadows);
+    mesh.name = `building-${key === "nightWindows" ? "night-windows" : key}`;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const paint = entries.map(entry => entry.paintColor ? {
+      from: new THREE.Color(entry.c), to: new THREE.Color(entry.paintColor),
+    } : null);
+    return { key, entries, mesh, paint, visible: 0 };
+  });
+  const officeDetails = officeBatches.find(group => group.key === "details");
+  const officeNight = officeBatches.find(group => group.key === "nightWindows");
+  const officeNameplate = officeModel.facade.find(entry => entry.id === "entry-nameplate");
+  const officeSign = label("LITTLE WORKS", officeNameplate.w * .94, officeNameplate.h * .85, {
+    background: "#354b56", color: "#d9dfdb", border: false, font: "bold 40px monospace",
+  });
+  officeSign.name = "office-nameplate";
+  officeSign.position.set(officeNameplate.x, officeNameplate.y, officeNameplate.z + officeNameplate.d / 2 + .003);
+  building.add(officeSign);
+  const allOfficeEntries = officeBatches.flatMap(group => group.entries);
+  const permanentStructureCount = allOfficeEntries.filter(entry => (entry.removeAt ?? 2) >= 2).length;
+  const officeCenter = new THREE.Vector3(4.5, 2.8, -1.55);
+  let officeFineDetail = true;
+  let lastBuildingProgress = NaN;
   dynamic.push(() => {
-    let visible = 0, permanentVisible = 0;
-    structure.forEach((entry, index) => {
-      let reveal = smooth01((state.buildProgress - entry.stage) / .055);
-      if (entry.removeAt < 2)
-        reveal *= 1 - smooth01((state.buildProgress - entry.removeAt) / .045);
-      const scale = Math.max(.001, reveal);
-      const lateralScale = Math.max(.001, smooth01(reveal * 4));
-      cubeMatrix.position.set(entry.x, entry.y - entry.h * (1 - scale) / 2, entry.z);
-      cubeMatrix.scale.set(entry.w * lateralScale, entry.h * scale, entry.d * lateralScale);
-      cubeMatrix.rotation.set(entry.rx || 0, entry.ry || 0, entry.rz || 0);
-      cubeMatrix.updateMatrix();
-      buildingMesh.setMatrixAt(index, cubeMatrix.matrix);
-      if (reveal > .5) visible++;
-      if (entry.removeAt >= 2 && reveal > .5) permanentVisible++;
-    });
-    buildingMesh.instanceMatrix.needsUpdate = true;
+    const distance = camera.position.distanceTo(officeCenter);
+    if (state.quality === "low" || distance > 28) officeFineDetail = false;
+    else if (distance < 25) officeFineDetail = true;
+    officeDetails.mesh.visible = officeFineDetail && officeDetails.visible > 0;
+    if (metrics.building) metrics.building.finishDetail = officeFineDetail;
+    if (state.buildProgress === lastBuildingProgress) return;
+    lastBuildingProgress = state.buildProgress;
+    officeSign.visible = state.buildProgress >= officeNameplate.stage + officeNameplate.duration;
+    let visible = 0, permanentVisible = 0, paintedPanels = 0;
+    for (const group of officeBatches) {
+      let batchVisible = 0, drawCount = 0, paintChanged = false;
+      group.entries.forEach((entry, index) => {
+        let reveal = smooth01((state.buildProgress - entry.stage) / (entry.duration ?? .055));
+        if ((entry.removeAt ?? 2) < 2)
+          reveal *= 1 - smooth01((state.buildProgress - entry.removeAt) / .045);
+        const scale = Math.max(.001, reveal);
+        const lateralScale = Math.max(.001, smooth01(reveal * 4));
+        cubeMatrix.position.set(entry.x, entry.y - entry.h * (1 - scale) / 2, entry.z);
+        cubeMatrix.scale.set(entry.w * lateralScale, entry.h * scale, entry.d * lateralScale);
+        cubeMatrix.rotation.set(entry.rx || 0, entry.ry || 0, entry.rz || 0);
+        cubeMatrix.updateMatrix();
+        group.mesh.setMatrixAt(index, cubeMatrix.matrix);
+        const paint = group.paint[index];
+        if (paint) {
+          const amount = smooth01((state.buildProgress - entry.paintFrom) / (entry.paintTo - entry.paintFrom));
+          group.mesh.setColorAt(index, tmpColor.lerpColors(paint.from, paint.to, amount));
+          paintChanged = true;
+          if (amount >= .999) paintedPanels++;
+        }
+        if (reveal > .001) { batchVisible++; drawCount = index + 1; }
+        if (reveal > .5) visible++;
+        if ((entry.removeAt ?? 2) >= 2 && reveal > .5) permanentVisible++;
+      });
+      group.visible = batchVisible;
+      // Permanent structural entries precede temporary scaffolding/rebar.
+      // Trim the invisible tail without repacking source indices or allocating
+      // a new GPU buffer, and restore it naturally when scrubbing backwards.
+      group.mesh.count = drawCount;
+      group.mesh.visible = batchVisible > 0 && (group.key !== "details" || officeFineDetail);
+      group.mesh.instanceMatrix.needsUpdate = true;
+      if (paintChanged) group.mesh.instanceColor.needsUpdate = true;
+    }
     metrics.building = {
-      total: structure.length,
+      total: allOfficeEntries.length,
       visible,
       progress: state.buildProgress,
-      completion: visible / structure.length,
+      completion: visible / allOfficeEntries.length,
       permanentVisible,
       permanentTotal: permanentStructureCount,
       permanentCompletion: permanentVisible / permanentStructureCount,
+      paintedPanels,
+      finishDetail: officeFineDetail,
+      batches: officeBatches.map(group => ({ name: group.mesh.name, total: group.entries.length, visible: group.visible })),
     };
   });
   metrics.zones.push({ name: "building", x: 4.5, z: -1.55, radius: 3.2 });
@@ -483,15 +613,17 @@ function initialize() {
   groundSign("REBAR", -4.5, 4.67, 1.5); groundSign("MATERIALS", 1.5, 4.65, 2.6);
   // Offices occupy the rear strip, outside all vehicle swept paths.
   const warmMaterial = new THREE.MeshStandardMaterial({ color: "#acc8d1", emissive: "#ffd786", emissiveIntensity: 0, roughness: .22, metalness: .12 });
+  const officeWindows = [];
   for (let office = 0; office < 2; office++) {
     const x = -1.8 + office * 3.6, z = -4.25;
     box(terrain, x, .77, z, 3.1, 1.48, 1.45, office ? "#dce0d7" : "#86b2ba");
     box(terrain, x, 1.59, z, 3.24, .15, 1.58, "#477083");
     for (let i = 0; i < 20; i++) box(terrain, x - 1.45 + i * .15, .8, z + .735, .028, 1.32, .025, "#b7cccc");
     box(terrain, x - .95, .6, z + .757, .5, 1.1, .035, "#4d6877");
-    for (const offset of [.0, .9]) meshBox(scene, x + offset, 1, z + .758, .66, .48, .03, warmMaterial);
+    for (const offset of [.0, .9]) box(officeWindows, x + offset, 1, z + .758, .66, .48, .03, "#ffffff");
     box(terrain, x - .95, .06, z + 1, .72, .1, .4, "#9a9d95");
   }
+  batch(scene, officeWindows, warmMaterial);
   sign("SITE OFFICE", -1.3, 1.32, -3.46, 1.55, .21, 0, "#dfebd9");
   // Voxel spoil heaps, with low layers rather than intersecting oversized primitives.
   for (let ix = 0; ix < 11; ix++) for (let iz = 0; iz < 8; iz++) {
@@ -508,17 +640,19 @@ function initialize() {
   }
   const luminousMaterial = new THREE.MeshBasicMaterial({ color: "#ffe0a1" });
   const lamps = [];
+  const lampHeads = [];
   for (const [x, z] of lampPositions) {
     box(terrain, x, 1.5, z, .065, 3, .065, "#647d89");
     box(terrain, x + .17, 3, z, .4, .07, .08, "#697b7d");
-    const head = meshBox(scene, x + .35, 2.95, z, .36, .14, .29, luminousMaterial);
+    box(lampHeads, x + .35, 2.95, z, .36, .14, .29, "#ffffff");
     const light = new THREE.PointLight("#ffce7d", 0, 6, 2);
     light.position.set(x + .35, 2.8, z); scene.add(light);
-    lamps.push({ head, light });
+    lamps.push({ light });
   }
+  batch(scene, lampHeads, luminousMaterial);
   for (let i = 0; i < 44; i++) {
     const x = -12.9 + i * .6;
-    box(terrain, x, 1.18 + .07 * Math.sin(i), -9.65, .18, .2, .04, ["#dd704b", "#ecd054", "#6cb5ba"][i % 3]);
+    box(terrain, x, 1.18 + .07 * Math.sin(i), -11.65, .18, .2, .04, ["#dd704b", "#ecd054", "#6cb5ba"][i % 3]);
   }
   for (const x of [-12.85, 12.85]) {
     box(terrain, x, 2.3, -8.8, .15, 4.6, .15, "#866644");
@@ -535,8 +669,10 @@ function initialize() {
     highEntries,
     lowEntries,
     switchDistance = 30,
+    persistent = false,
   }) {
     const root = new THREE.Group();
+    root.name = `district:${id}`;
     root.position.set(position[0], 0, position[1]);
     scene.add(root);
     const highGroup = new THREE.Group();
@@ -557,7 +693,7 @@ function initialize() {
     };
     lodDistricts.push(district);
     dynamic.push(() => {
-      const reveal =
+      const reveal = persistent ? 1 :
         smooth01(
           (state.buildProgress - start) / .12,
         ) *
@@ -659,6 +795,11 @@ function initialize() {
   groundSign("LOGISTICS", -11.75, 3.55, 1.8);
   groundSign("UTILITIES", 0, 9.42, 2.2);
   groundSign("PRECAST", 11.75, 4.15, 1.7);
+  for (const district of EXPANSION_DISTRICTS) {
+    addLodDistrict(district);
+    const plate = district.sign;
+    sign(plate.text, plate.x, plate.y, plate.z, plate.width, plate.height, plate.ry || 0, "#e5d5a6");
+  }
   metrics.site.lodZoneCount = lodDistricts.length;
   metrics.site.lodHighInstances = lodDistricts.reduce(
     (total, district) => total + district.highInstances,
@@ -672,14 +813,20 @@ function initialize() {
   // Wheels and articulated mechanisms use isolated local frames.
   const rubber = new THREE.MeshStandardMaterial({ color: "#2e3437", roughness: .95 });
   const steel = new THREE.MeshStandardMaterial({ color: "#819097", roughness: .38, metalness: .55 });
+  const wheelGeometry = new Map();
   function wheel(parent, x, y, z, radius = .3) {
     const axle = new THREE.Group();
     axle.position.set(x, y, z);
     axle.userData.radius = radius;
     parent.add(axle);
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, .22, 12), rubber);
+    if (!wheelGeometry.has(radius)) wheelGeometry.set(radius, {
+      tire: new THREE.CylinderGeometry(radius, radius, .22, 12),
+      hub: new THREE.CylinderGeometry(radius * .42, radius * .42, .24, 8),
+    });
+    const geometry = wheelGeometry.get(radius);
+    const mesh = new THREE.Mesh(geometry.tire, rubber);
     mesh.rotation.z = Math.PI / 2; mesh.castShadow = true; axle.add(mesh);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(radius * .42, radius * .42, .24, 8), steel);
+    const hub = new THREE.Mesh(geometry.hub, steel);
     hub.rotation.z = Math.PI / 2; axle.add(hub);
     return axle;
   }
@@ -963,6 +1110,7 @@ function initialize() {
     };
   });
   const loader = new THREE.Group();
+  loader.name = "site-loader";
   loader.position.set(7.2, .04, .7);
   scene.add(loader);
   contactShadow(loader, 1.45, 1.8, -.015);
@@ -1201,6 +1349,8 @@ function initialize() {
     box(workerParts, worker.x + x, worker.y + y, worker.z + z, w, h, d, part === 2 ? helmet : color);
   }));
   const workerMesh = batch(scene, workerParts);
+  workerMesh.name = "site-workers";
+  workerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const toolSpecs = workers.map(worker =>
     worker.role === "supervisor"
       ? { w: .18, h: .22, d: .025, color: "#dce8eb" }
@@ -1224,6 +1374,8 @@ function initialize() {
     c: tool.color,
   }));
   const workerToolMesh = batch(scene, workerTools);
+  workerToolMesh.name = "worker-tools";
+  workerToolMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const officeFootprints = [
     { x: -1.8, z: -4.25, halfX: 1.55, halfZ: .725 },
     { x: 1.8, z: -4.25, halfX: 1.55, halfZ: .725 },
@@ -1257,7 +1409,15 @@ function initialize() {
         .map(worker => ({ x: worker.x, z: worker.z })),
     },
   };
+  let lastWorkerTime = NaN, lastWorkerProgress = NaN, lastWorkerReset = NaN;
   dynamic.push(time => {
+    if (time === lastWorkerTime && state.buildProgress === lastWorkerProgress && state.resetTransition === lastWorkerReset) {
+      metrics.activity.workers = metrics.workers.active;
+      return;
+    }
+    lastWorkerTime = time;
+    lastWorkerProgress = state.buildProgress;
+    lastWorkerReset = state.resetTransition;
     let motionChecksum = 0, activeWorkers = 0;
     let activePerimeter = 0;
     let officeIntrusions = 0;
@@ -1422,32 +1582,34 @@ function initialize() {
   bp.fillStyle = "#b9d6e1"; bp.font = "14px monospace"; bp.fillText("SITE 001 / FOUNDATION PLAN", 60, 336); bp.fillText("1:48", 400, 336);
   const bpTex = new THREE.CanvasTexture(blueprint); bpTex.colorSpace = THREE.SRGBColorSpace;
   const paper = new THREE.Mesh(new THREE.PlaneGeometry(4.7, 3.5), new THREE.MeshStandardMaterial({ map: bpTex, roughness: .95 }));
-  paper.rotation.set(-Math.PI / 2, 0, -.2); paper.position.set(-15.2, -.887, 7.4); scene.add(paper);
+  paper.rotation.set(-Math.PI / 2, 0, Math.PI / 2 - .08); paper.position.set(-18, -.887, 7.4); scene.add(paper);
   const props = [];
-  box(props, 15.2, -.49, 9.8, 1, .72, .85, "#e4b544"); box(props, 15.2, -.09, 9.8, .77, .08, .7, "#464e50");
-  for (let j = 0; j < 25; j++) { box(props, 13.7 + j * .14, -.84, 11.3, .15, .025, .22, "#d3cec0"); if (j % 2 === 0) box(props, 13.7 + j * .14, -.821, 11.33, .018, .009, .11, "#424948"); }
-  box(props, -15, -.64, -10.3, 3.3, .3, .5, "#879390"); box(props, -15, -.44, -10.3, .66, .08, .31, "#b7d678"); box(props, -15, -.391, -10.3, .045, .012, .27, "#475b41");
+  box(props, 17.3, -.49, 11.2, 1, .72, .85, "#e4b544"); box(props, 17.3, -.09, 11.2, .77, .08, .7, "#464e50");
+  for (let j = 0; j < 25; j++) { box(props, 15.8 + j * .14, -.84, 13.3, .15, .025, .22, "#d3cec0"); if (j % 2 === 0) box(props, 15.8 + j * .14, -.821, 13.33, .018, .009, .11, "#424948"); }
+  box(props, -17.5, -.64, -12.7, 3.3, .3, .5, "#879390"); box(props, -17.5, -.44, -12.7, .66, .08, .31, "#b7d678"); box(props, -17.5, -.391, -12.7, .045, .012, .27, "#475b41");
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(.65, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: "#ebaf37", roughness: .45 }));
-  helmet.position.set(15.2, -.78, -10.8); scene.add(helmet);
-  box(props, 15.2, -.79, -10.8, 1.55, .07, 1.4, "#daa234"); box(props, 15.2, -.26, -10.8, .09, .18, 1, "#e7b846");
+  helmet.position.set(17.3, -.78, -12.8); scene.add(helmet);
+  box(props, 17.3, -.79, -12.8, 1.55, .07, 1.4, "#daa234"); box(props, 17.3, -.26, -12.8, .09, .18, 1, "#e7b846");
   batch(scene, props);
 
   // Physical knobs are raycastable; all their effects are also keyboard accessible.
-  const knobGroup = new THREE.Group(); knobGroup.position.set(.5, -.64, 11.6); scene.add(knobGroup);
+  const knobGroup = new THREE.Group(); knobGroup.position.set(.5, -.64, 13.7); scene.add(knobGroup);
   const panelMat = new THREE.MeshStandardMaterial({ color: "#35434b", metalness: .5, roughness: .4 });
   meshBox(knobGroup, 0, 0, 0, 7, .28, 1.45, panelMat);
   const knobs = [];
+  const knobGeometry = new THREE.CylinderGeometry(.37, .4, .26, 20);
+  const knobPointerMaterial = new THREE.MeshBasicMaterial({ color: "#efbc55" });
   for (let i = 0; i < 3; i++) {
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(.37, .4, .26, 20), steel);
+    const knob = new THREE.Mesh(knobGeometry, steel);
     knob.position.set(-2.2 + i * 2.2, .25, -.1); knob.userData.control = i; knobGroup.add(knob); knobs.push(knob);
-    const pointer = meshBox(knob, 0, .14, .2, .065, .035, .17, new THREE.MeshBasicMaterial({ color: "#efbc55" }));
+    const pointer = meshBox(knob, 0, .14, .2, .065, .035, .17, knobPointerMaterial);
     pointer.castShadow = false;
     const caption = label(["SPEED", "DAY / NIGHT", "DUST"][i], 1.6, .26, { background: "#35434b", color: "#d8dcda", font: "36px monospace", border: false });
     caption.rotation.x = -Math.PI / 2; caption.position.set(knob.position.x, .153, .5); knobGroup.add(caption);
   }
   const raycaster = new THREE.Raycaster(), pointerPosition = new THREE.Vector2();
   let downPoint = null;
-  canvas.addEventListener("pointerdown", e => { downPoint = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener("pointerdown", e => { downPoint = { x: e.clientX, y: e.clientY }; canvas.focus({ preventScroll: true }); });
   canvas.addEventListener("pointerup", e => {
     if (!downPoint || Math.hypot(e.clientX - downPoint.x, e.clientY - downPoint.y) > 5) return;
     const rect = canvas.getBoundingClientRect(); pointerPosition.set((e.clientX - rect.left) / rect.width * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
@@ -1473,95 +1635,521 @@ function initialize() {
   });
   const dust = new THREE.Points(dustGeo, dustMaterial); scene.add(dust);
   const rainPositions = new Float32Array(1400 * 6);
-  const rainSeeds = Array.from({ length: 1400 }, () => ({ x: -13 + random() * 26, z: -9.4 + random() * 18.8, y: random() * 11 }));
+  const expansionRoofs = EXPANSION_DISTRICTS.flatMap(district => district.roofs);
+  const officeRainRoofs = officeModel.roofs.map(roof => ({
+    ...roof,
+    minX: building.position.x + roof.x - roof.w / 2,
+    maxX: building.position.x + roof.x + roof.w / 2,
+    minZ: building.position.z + roof.z - roof.d / 2,
+    maxZ: building.position.z + roof.z + roof.d / 2,
+  }));
+  const rainSeeds = Array.from({ length: 1400 }, () => {
+    const x = -15 + random() * 30, z = -11.4 + random() * 22.8, y = random() * 11;
+    let roof = x > -6.7 && x < -2.3 && z > 2.2 && z < 4.6 ? 2.08 :
+      x > -3.4 && x < 3.4 && z > -5.05 && z < -3.45 ? 1.7 : .04;
+    for (const bounds of expansionRoofs) {
+      if (x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ) roof = Math.max(roof, bounds.y);
+    }
+    // X/Z membership never changes: only the few roof stages are checked later.
+    const officeRoofs = officeRainRoofs.filter(bounds => x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ);
+    return { x, y, z, roof, officeRoofs, building: x > 2.05 && x < 6.95 && z > -3.8 && z < .7 };
+  });
   const rainGeo = new THREE.BufferGeometry(); rainGeo.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
+  rainGeo.attributes.position.setUsage(THREE.DynamicDrawUsage);
+  rainGeo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 5.5, 0), 20.5);
+  let lastRainTime = NaN, lastRainProgress = NaN, lastRainCount = 0;
   const rain = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: "#abc3d1", transparent: true, opacity: .48, depthWrite: false })); rain.visible = false; scene.add(rain);
+  rain.name = "site-rain";
   const glowMaterial = new THREE.ShaderMaterial({
     uniforms: { strength: { value: 0 } },
     vertexShader: `varying vec2 vUv; void main(){vUv=uv;vec4 c=modelViewMatrix*vec4(0.,0.,0.,1.);c.xy+=position.xy;gl_Position=projectionMatrix*c;}`,
     fragmentShader: `varying vec2 vUv;uniform float strength;void main(){float a=pow(max(0.,1.-length(vUv-.5)*2.),2.5)*strength;gl_FragColor=vec4(1.,.73,.34,a);}`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
-  for (const lamp of lamps) { const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), glowMaterial); glow.position.copy(lamp.light.position); scene.add(glow); }
+  const glowGeometry = new THREE.PlaneGeometry(1.6, 1.6);
+  for (const lamp of lamps) { const glow = new THREE.Mesh(glowGeometry, glowMaterial); glow.position.copy(lamp.light.position); scene.add(glow); }
   const wetMaterial = new THREE.MeshPhysicalMaterial({ color: "#577184", roughness: .15, metalness: .42, transparent: true, opacity: 0, clearcoat: 1 });
   const wet = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 1.2), wetMaterial); wet.rotation.x = -Math.PI / 2; wet.position.set(5, .043, 5.7); scene.add(wet);
 
-  const speedInput = document.querySelector("#speed"), dayInput = document.querySelector("#cycle"), timeInput = document.querySelector("#time"), buildInput = document.querySelector("#build-stage"), cameraInput = document.querySelector("#camera-view"), dustInput = document.querySelector("#dust");
+  const speedInput = $("#speed"), dayInput = $("#cycle"), timeInput = $("#time"), buildInput = $("#build-stage"), cameraInput = $("#camera-view"), dustInput = $("#dust");
+  const fieldbook = $("#fieldbook"), settingsDialog = $("#scene-settings"), resetDialog = $("#reset-confirm");
+  const buildRange = $("#build-progress"), dayRange = $("#day-progress"), markersContainer = $("#site-markers");
+  const tabButtons = [...document.querySelectorAll("[data-tab]")];
+  const zoneButtons = new Map(), chapterButtons = new Map(), compactChapterButtons = new Map();
+  const markerButtons = [];
+  let selectedZone = SITE_ZONES[0], currentChapterId = null, activeTab = "story", tourIndex = -1, toastTimer;
+  let qualityProfile = initialQuality, fpsThrottle = 0, lastUiTime = -Infinity, lastSamplePaused = state.paused;
+  const setText = (selector, value) => { const element = $(selector); if (element.textContent !== value) element.textContent = value; };
+  const labelButton = (button, text, arrow = "↗") => {
+    const symbol = document.createElement("span");
+    symbol.setAttribute("aria-hidden", "true");
+    symbol.textContent = arrow;
+    button.replaceChildren(document.createTextNode(text), symbol);
+  };
+  function toast(message) {
+    clearTimeout(toastTimer);
+    setText("#scene-toast", message);
+    $("#scene-toast").hidden = false;
+    toastTimer = setTimeout(() => { $("#scene-toast").hidden = true; }, 4200);
+  }
+  function revealActiveChapter() {
+    const shortcut = compactChapterButtons.get(currentChapterId);
+    if (shortcut?.getClientRects().length) shortcut.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }
+  function setBook(open, focus = false) {
+    const hidesFocusedControl = !open && fieldbook.contains(document.activeElement);
+    fieldbook.hidden = !open;
+    $("#fieldbook-toggle").setAttribute("aria-expanded", String(open));
+    frameAroundFieldbook();
+    if (open) revealActiveChapter();
+    if (focus) (open ? $("#fieldbook-close") : $("#fieldbook-toggle")).focus({ preventScroll: true });
+    else if (hidesFocusedControl) canvas.focus({ preventScroll: true });
+  }
+  function frameAroundFieldbook() {
+    // A lens shift keeps the chosen subject in the center of the unobscured
+    // viewport. Changing the OrbitControls target instead would orbit the wrong
+    // point and let the subject drift under the notebook again.
+    const panelRight = !fieldbook.hidden && innerWidth > 650 ? fieldbook.getBoundingClientRect().right : 0;
+    const inset = panelRight > 0 ? Math.min(innerWidth * .4, panelRight + 20) : 0;
+    if (inset) camera.setViewOffset(innerWidth, innerHeight, -inset / 2, 0, innerWidth, innerHeight);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+  }
+  function setTab(name, focus = false) {
+    if (!["story", "zones", "guide"].includes(name)) return;
+    activeTab = name;
+    for (const tab of tabButtons) {
+      const selected = tab.dataset.tab === name;
+      tab.setAttribute("aria-selected", String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      $(`#panel-${tab.dataset.tab}`).hidden = !selected;
+      if (selected && focus) tab.focus();
+    }
+    $(".fieldbook-scroll").scrollTop = 0;
+  }
+  function endTour(announce = true) {
+    if (tourIndex < 0) return;
+    tourIndex = -1;
+    $("#tour-progress").hidden = true;
+    $("#tour-card").hidden = false;
+    $("#quick-tour").hidden = false;
+    if (announce) toast("导览结束。镜头和工序留在这里，继续随意看看。");
+  }
+  function chooseStage(progress, { focusCamera = false, fromTour = false, announce = false } = {}) {
+    if (!fromTour) endTour(false);
+    state.buildMode = "manual";
+    state.manualBuild = clamp01(progress);
+    state.buildProgress = state.manualBuild;
+    state.resetTransition = 0;
+    const chapter = getChapter(state.manualBuild);
+    if (focusCamera) setCameraPreset(chapter.camera);
+    syncControls();
+    updateFieldbook();
+    if (announce) toast(state.paused ? `已切到「${chapter.short}」。世界仍暂停，点击继续观察它的动作。` : `已切到「${chapter.short}」。工序停在这里，设备按自己的节奏运转。`);
+  }
+  function resumeConstruction() {
+    endTour(false);
+    constructionTime = Math.floor(constructionTime / BUILD_CYCLE_SECONDS) * BUILD_CYCLE_SECONDS + state.buildProgress * BUILD_CYCLE_SECONDS * BUILD_GROW_END;
+    state.buildMode = "auto";
+    syncControls();
+    toast(state.paused ? "已接上自动工序。点击继续，让工地运行。" : "从当前进度，继续自动施工。");
+  }
+  function updateFieldbook() {
+    const chapter = getChapter(state.buildProgress);
+    if (chapter.id !== currentChapterId) {
+      currentChapterId = chapter.id;
+      setText("#chapter-number", chapter.number);
+      setText("#chapter-eyebrow", chapter.label);
+      setText("#chapter-title", chapter.title);
+      setText("#chapter-story", chapter.story);
+      setText("#chapter-detail", chapter.detail);
+      labelButton($("#chapter-focus"), chapter.focus);
+      for (const [id, button] of chapterButtons) {
+        if (id === chapter.id) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+      }
+      for (const [id, button] of compactChapterButtons) {
+        if (id === chapter.id) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+      }
+      revealActiveChapter();
+    }
+    const mode = state.paused ? "时间停在这里" : state.buildMode === "auto" ? "现场正在生长" : "手动工序 · 设备运行中";
+    setText("#book-status", state.resetTransition > 0 ? "准备下一轮小工地" : mode);
+    updateScrollHint();
+  }
+  function updateScrollHint() {
+    const scroller = $("#fieldbook-scroll");
+    const overflow = scroller.scrollHeight > scroller.clientHeight + 8;
+    const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 12;
+    $("#book-scroll-hint").hidden = !overflow;
+    setText("#book-scroll-hint", atBottom ? "回到页首 ↑" : "向下看更多 ↓");
+    $("#book-scroll-hint").dataset.direction = atBottom ? "up" : "down";
+    scroller.classList.toggle("can-scroll-down", overflow && !atBottom);
+  }
+  function selectZone(id, moveCamera = true) {
+    const zone = SITE_ZONES.find(item => item.id === id);
+    if (!zone) return;
+    selectedZone = zone;
+    setText("#zone-code", `ZONE ${zone.code}`);
+    setText("#zone-title", zone.name);
+    setText("#zone-description", zone.description);
+    setText("#zone-observe", zone.observe);
+    labelButton($("#zone-stage"), `看看${getChapter(zone.stage).short}阶段`);
+    for (const [id, button] of zoneButtons) button.setAttribute("aria-pressed", String(id === zone.id));
+    for (const marker of markerButtons) marker.button.setAttribute("aria-pressed", String(marker.zone.id === zone.id));
+    if (moveCamera) {
+      setCameraPreset(zone.camera);
+      if (innerWidth <= 650) { setBook(false); toast(`已走近${zone.name}。再次打开手札，可以继续读这里的记录。`); }
+    }
+    syncControls();
+  }
+  $("#site-plan").addEventListener("click", () => {
+    setCameraPreset("plan");
+    if (innerWidth <= 650) setBook(false);
+    toast("绿色步行带沿外围通向后场；灰色环路留给原有车队。");
+  });
+  for (const chapter of BUILD_CHAPTERS) {
+    const button = document.createElement("button");
+    const number = document.createElement("span");
+    number.textContent = chapter.number;
+    button.append(number, document.createTextNode(chapter.short));
+    button.setAttribute("aria-label", `第 ${Number(chapter.number)} 阶段：${chapter.label}`);
+    button.addEventListener("click", () => chooseStage(chapter.progress, { announce: true }));
+    $("#build-chapters").append(button);
+    chapterButtons.set(chapter.id, button);
+    const shortcut = document.createElement("button");
+    shortcut.textContent = chapter.short;
+    shortcut.title = `第 ${Number(chapter.number)} 阶段：${chapter.label}`;
+    shortcut.addEventListener("click", () => chooseStage(chapter.progress, { announce: true }));
+    $("#compact-chapters").append(shortcut);
+    compactChapterButtons.set(chapter.id, shortcut);
+  }
+  for (const zone of SITE_ZONES) {
+    const button = document.createElement("button"), code = document.createElement("span");
+    code.textContent = zone.code;
+    button.append(code, document.createTextNode(zone.name));
+    button.setAttribute("aria-pressed", "false");
+    button.addEventListener("click", () => { endTour(false); selectZone(zone.id); });
+    $("#zone-list").append(button);
+    zoneButtons.set(zone.id, button);
+    const marker = button.cloneNode(true);
+    marker.className = "site-marker";
+    marker.setAttribute("aria-label", `走近${zone.name}`);
+    marker.addEventListener("click", () => { endTour(false); setBook(true); setTab("zones"); selectZone(zone.id); });
+    markersContainer.append(marker);
+    markerButtons.push({ zone, button: marker, point: new THREE.Vector3(...zone.position) });
+  }
+  for (const equipment of EQUIPMENT) {
+    const details = document.createElement("details"), summary = document.createElement("summary");
+    const count = document.createElement("span"), name = document.createElement("span"), family = document.createElement("small");
+    count.textContent = equipment.number; name.textContent = equipment.name; family.textContent = equipment.family;
+    summary.append(count, name, family);
+    const note = document.createElement("p"), detail = document.createElement("p"), button = document.createElement("button");
+    note.textContent = equipment.note; detail.textContent = equipment.detail; detail.className = "equipment-detail";
+    button.className = "fieldbook-link"; labelButton(button, "看看它工作");
+    button.addEventListener("click", () => {
+      chooseStage(equipment.stage);
+      setCameraPreset(equipment.camera);
+      if (innerWidth <= 650) setBook(false);
+      toast(`已走近${equipment.name}，工序切到${getChapter(equipment.stage).short}${state.paused ? "；点击继续观察动作" : ""}。`);
+    });
+    details.append(summary, note, detail, button);
+    $("#equipment-list").append(details);
+  }
+  for (const tab of tabButtons) {
+    tab.addEventListener("click", () => setTab(tab.dataset.tab));
+    tab.addEventListener("keydown", event => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const index = tabButtons.indexOf(tab);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabButtons.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabButtons.length) % tabButtons.length;
+      setTab(tabButtons[next].dataset.tab, true);
+    });
+  }
+  function showTourStop(index) {
+    if (index >= BUILD_CHAPTERS.length) { endTour(); $("#fieldbook-toggle").focus(); return; }
+    tourIndex = Math.max(0, index);
+    const chapter = BUILD_CHAPTERS[tourIndex];
+    chooseStage(chapter.progress, { focusCamera: true, fromTour: true });
+    state.time = chapter.time; state.cycle = false; state.rain = false; state.orbit = false;
+    setTab("story");
+    setBook(innerWidth > 650);
+    $("#tour-progress").hidden = false;
+    $("#tour-card").hidden = true;
+    $("#quick-tour").hidden = true;
+    $("#tour-previous").disabled = tourIndex === 0;
+    setText("#tour-step", `第 ${tourIndex + 1} / ${BUILD_CHAPTERS.length} 站`);
+    setText("#tour-title", chapter.label);
+    setText("#tour-next", tourIndex === BUILD_CHAPTERS.length - 1 ? "完成导览 ✓" : "下一站 →");
+    syncControls();
+    if (state.paused) toast(`${chapter.label}已就位。世界仍暂停，点击继续观察动作。`);
+    else if (innerWidth <= 650) toast(`${chapter.label} · 点“手札”读这一站的观察记录。`);
+  }
+  function applyQuality() {
+    qualityProfile = getQualityProfile(state.quality, innerWidth, devicePixelRatio);
+    renderer.setPixelRatio(qualityProfile.ratio);
+    renderer.shadowMap.enabled = qualityProfile.shadows;
+    if (sun.shadow.mapSize.x !== qualityProfile.shadowSize) {
+      sun.shadow.map?.dispose(); sun.shadow.map = null;
+      sun.shadow.mapSize.set(qualityProfile.shadowSize, qualityProfile.shadowSize);
+    }
+    dustGeo.setDrawRange(0, qualityProfile.dustCount);
+    rainGeo.setDrawRange(0, qualityProfile.rainCount * 2);
+    dustMaterial.uniforms.ratio.value = renderer.getPixelRatio();
+    fpsThrottle = 0;
+    budgetSamples = 0; frameSampler.reset();
+    const descriptions = { auto: "自动适配屏幕，运行吃力时降低分辨率。", high: "更清晰的边缘与阴影，适合性能充足的设备。", low: "减少粒子与阴影，限制为 30 帧，适合手机或省电观察。" };
+    setText("#quality-description", descriptions[state.quality]);
+    metrics.quality = { mode: state.quality, pixelRatio: renderer.getPixelRatio(), shadowSize: qualityProfile.shadowSize, rainCount: qualityProfile.rainCount };
+  }
   function syncControls() {
-    speedInput.value = state.speed; dayInput.checked = state.cycle; buildInput.value = state.buildMode === "auto" ? "auto" : String(state.manualBuild); cameraInput.value = state.camera; dustInput.value = state.dust;
-    document.querySelector("#speed-label").textContent = `${state.speed}×`;
-    document.querySelector("#pause").textContent = state.paused ? "继续" : "暂停";
-    document.querySelector("#pause").setAttribute("aria-label", state.paused ? "继续机械" : "暂停机械");
-    document.querySelector("#rain").setAttribute("aria-pressed", state.rain);
-    document.querySelector("#weather-label").textContent = state.rain ? "暴雨" : "晴朗";
-    document.querySelector("#activity-label").textContent = state.paused ? "设备已暂停" : "设备运行中";
+    speedInput.value = state.speed; dayInput.checked = state.cycle;
+    $("#speed-preset").value = String(state.speed);
+    const exactChapter = BUILD_CHAPTERS.find(chapter => Math.abs(chapter.progress - state.manualBuild) < .0001);
+    buildInput.value = state.buildMode === "auto" ? "auto" : exactChapter ? String(exactChapter.progress) : "custom";
+    const exactTime = [0, .25, .5, .75].find(value => Math.abs(value - state.time) < .0001);
+    timeInput.value = exactTime === undefined ? "custom" : String(exactTime);
+    cameraInput.value = state.camera; dustInput.value = state.dust;
+    $("#orbit").checked = state.orbit; $("#labels").checked = state.labels; $("#quality").value = state.quality;
+    $("#orbit").disabled = reducedMotion.matches;
+    setText("#speed-label", `${state.speed}×`);
+    speedInput.setAttribute("aria-valuetext", `${state.speed} 倍时间流速`);
+    setText("#pause-text", state.paused ? "继续" : "暂停");
+    setText("#pause-symbol", state.paused ? "▶" : "Ⅱ");
+    $("#pause").setAttribute("aria-label", state.paused ? "继续整个小世界" : "暂停整个小世界");
+    $("#pause").setAttribute("aria-pressed", String(state.paused));
+    $("#run-light").classList.toggle("is-paused", state.paused);
+    $("#rain").setAttribute("aria-pressed", String(state.rain));
+    setText("#rain", state.rain ? "雨天 · 切回晴朗" : "晴朗 · 下点雨");
+    setText("#weather-label", state.rain ? "雨天" : "晴朗");
+    setText("#timeline-mode", state.buildMode === "auto" ? "自动" : "手动");
+    $("#auto-build").setAttribute("aria-pressed", String(state.buildMode === "auto"));
+    $("#auto-build").title = state.buildMode === "auto" ? "把工序留在当前进度，机械继续运行" : "从当前进度接回自动施工";
+    $("#auto-build").setAttribute("aria-label", state.buildMode === "auto" ? "暂停工序生长，机械继续活动" : "从当前阶段继续自动施工");
+    setText("#auto-build", state.buildMode === "auto" ? "自动施工中" : "跟随自动施工");
+    $("#marker-toggle").setAttribute("aria-pressed", String(state.labels));
+    setText("#marker-toggle", state.labels ? "收起场地标牌" : "显示场地标牌");
+    markersContainer.hidden = !state.labels;
+    dayRange.value = getSceneMinute(state.time);
+    setText("#day-progress-label", formatSceneTime(state.time));
+    lastUiTime = -Infinity;
   }
   speedInput.addEventListener("input", e => { state.speed = Number(e.target.value); syncControls(); });
+  $("#speed-preset").addEventListener("change", e => { state.speed = Number(e.target.value); syncControls(); });
   dayInput.addEventListener("change", e => { state.cycle = e.target.checked; syncControls(); });
   timeInput.addEventListener("change", e => { state.time = Number(e.target.value); state.cycle = false; syncControls(); });
+  dayRange.addEventListener("input", e => { state.time = Number(e.target.value) / 1440; state.cycle = false; syncControls(); });
+  buildRange.addEventListener("input", e => chooseStage(Number(e.target.value) / 100));
   buildInput.addEventListener("change", e => {
-    state.buildMode = e.target.value === "auto" ? "auto" : "manual";
-    if (state.buildMode === "manual") state.manualBuild = Number(e.target.value);
-    syncControls();
+    if (e.target.value === "auto") resumeConstruction();
+    else chooseStage(Number(e.target.value));
   });
   cameraInput.addEventListener("change", e => { setCameraPreset(e.target.value); syncControls(); });
   dustInput.addEventListener("change", e => { state.dust = Number(e.target.value); syncControls(); });
-  document.querySelector("#pause").addEventListener("click", () => { state.paused = !state.paused; syncControls(); });
-  document.querySelector("#rain").addEventListener("click", () => { state.rain = !state.rain; syncControls(); });
-  document.querySelector("#reset-camera").addEventListener("click", () => { setCameraPreset("overview"); lastInteraction = performance.now(); });
+  $("#pause").addEventListener("click", () => { state.paused = !state.paused; syncControls(); });
+  $("#rain").addEventListener("click", () => { state.rain = !state.rain; syncControls(); });
+  $("#reset-camera").addEventListener("click", () => { setCameraPreset("overview"); syncControls(); });
+  $("#orbit").addEventListener("change", event => { state.orbit = event.target.checked; lastInteraction = performance.now(); syncControls(); });
+  $("#labels").addEventListener("change", event => { state.labels = event.target.checked; syncControls(); });
+  $("#marker-toggle").addEventListener("click", () => { state.labels = !state.labels; syncControls(); });
+  $("#quality").addEventListener("change", event => { state.quality = event.target.value; applyQuality(); syncControls(); });
+  $("#fieldbook-toggle").addEventListener("click", () => setBook(fieldbook.hidden));
+  $("#fieldbook-close").addEventListener("click", () => setBook(false, true));
+  $("#chapter-focus").addEventListener("click", () => { setCameraPreset(getChapter(state.buildProgress).camera); if (innerWidth <= 650) setBook(false); syncControls(); });
+  $("#auto-build").addEventListener("click", () => { if (state.buildMode !== "auto") resumeConstruction(); else { chooseStage(state.buildProgress); toast("工序留在当前进度，仍可观察机械的动作。"); } });
+  $("#zone-stage").addEventListener("click", () => { chooseStage(selectedZone.stage); setCameraPreset(selectedZone.camera); if (innerWidth <= 650) setBook(false); });
+  $("#start-tour").addEventListener("click", () => { showTourStop(0); $("#tour-next").focus({ preventScroll: true }); });
+  $("#quick-tour").addEventListener("click", () => { showTourStop(0); $("#tour-next").focus({ preventScroll: true }); });
+  $("#fieldbook-scroll").addEventListener("scroll", updateScrollHint, { passive: true });
+  $("#book-scroll-hint").addEventListener("click", () => {
+    const scroller = $("#fieldbook-scroll");
+    scroller.scrollTo({ top: $("#book-scroll-hint").dataset.direction === "up" ? 0 : scroller.scrollTop + scroller.clientHeight * .75, behavior: reducedMotion.matches ? "auto" : "smooth" });
+  });
+  $("#tour-next").addEventListener("click", () => showTourStop(tourIndex + 1));
+  $("#tour-previous").addEventListener("click", () => showTourStop(tourIndex - 1));
+  $("#tour-exit").addEventListener("click", () => { endTour(); $("#fieldbook-toggle").focus(); });
+  $("#settings-toggle").addEventListener("click", () => { refreshStorageStatus(); syncControls(); settingsDialog.showModal(); });
+  $("#settings-close").addEventListener("click", () => settingsDialog.close());
+  for (const dialog of [settingsDialog, resetDialog]) dialog.addEventListener("click", event => { if (event.target === dialog) { const bounds = dialog.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close(); } });
+  function moveCamera(zoom, horizontal = 0, vertical = 0) {
+    cameraTransition = null; controls.autoRotate = false;
+    clearCameraInertia();
+    lastInteraction = performance.now(); state.camera = "custom";
+    const offset = camera.position.clone().sub(controls.target);
+    const spherical = new THREE.Spherical().setFromVector3(offset);
+    spherical.radius = THREE.MathUtils.clamp(spherical.radius * zoom, controls.minDistance, controls.maxDistance);
+    spherical.theta += horizontal;
+    spherical.phi = THREE.MathUtils.clamp(spherical.phi + vertical, controls.minPolarAngle, controls.maxPolarAngle);
+    camera.position.copy(controls.target).add(offset.setFromSpherical(spherical));
+    controls.update(); syncControls();
+  }
+  $("#zoom-in").addEventListener("click", () => moveCamera(.86));
+  $("#zoom-out").addEventListener("click", () => moveCamera(1.16));
   window.addEventListener("keydown", e => {
-    if (e.code === "Space" && !["INPUT", "SELECT", "BUTTON"].includes(document.activeElement?.tagName)) { e.preventDefault(); state.rain = !state.rain; syncControls(); }
+    if (settingsDialog.open || resetDialog.open || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "Escape") { e.preventDefault(); if (tourIndex >= 0) { endTour(); $("#fieldbook-toggle").focus(); } else setBook(false, true); return; }
+    if (["INPUT", "SELECT", "BUTTON", "TEXTAREA", "SUMMARY"].includes(document.activeElement?.tagName)) return;
+    if (e.code === "Space") { e.preventDefault(); state.paused = !state.paused; syncControls(); }
+    else if (e.key.toLowerCase() === "r") { state.rain = !state.rain; syncControls(); }
+    else if (e.key.toLowerCase() === "h") setBook(fieldbook.hidden);
+    else if (e.key === "0") { setCameraPreset("overview"); syncControls(); }
+    else if (/^[1-9]$/.test(e.key)) chooseStage(BUILD_CHAPTERS[Number(e.key) - 1].progress, { announce: true });
+    else if (e.key === "+" || e.key === "=") { e.preventDefault(); moveCamera(.9); }
+    else if (e.key === "-") { e.preventDefault(); moveCamera(1.1); }
+    else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); moveCamera(1, e.key === "ArrowLeft" ? -.12 : e.key === "ArrowRight" ? .12 : 0, e.key === "ArrowUp" ? -.08 : e.key === "ArrowDown" ? .08 : 0); }
   });
   window.addEventListener("message", e => {
-    if (e.source !== parent || e.data?.type !== "little-works-visibility") return;
+    if (e.source !== parent || (location.origin !== "null" && e.origin !== location.origin)) return;
+    if (e.data?.type !== "little-works-visibility" || typeof e.data.active !== "boolean") return;
+    if (state.externalPause !== !e.data.active) {
+      // A hidden iframe may receive no animation callbacks at all. Reset on the
+      // visibility message itself so its first visible frame never catches up.
+      last = performance.now(); fpsThrottle = 0; frameSampler.reset();
+    }
     state.externalPause = !e.data.active;
   });
+  reducedMotion.addEventListener("change", event => { if (event.matches) { state.orbit = false; state.paused = true; state.cycle = false; cameraTransition = null; clearCameraInertia(); } syncControls(); });
+
+  function refreshStorageStatus(message) {
+    try {
+      const serialized = localStorage.getItem(OBSERVATION_KEY);
+      const saved = readObservation(serialized);
+      $("#restore-view").disabled = !saved;
+      $("#forget-view").hidden = !serialized;
+      const when = saved?.savedAt ? new Date(saved.savedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+      setText("#storage-status", message || (saved ? `已有观察${when ? ` · ${when}` : ""}。只保存在这台设备。` : serialized ? "这份观察无法读取，可以移除后重新保存。" : "只保存在这台设备，不会上传。"));
+      return saved;
+    } catch {
+      $("#restore-view").disabled = true;
+      $("#forget-view").hidden = true;
+      setText("#storage-status", "浏览器没有开放本地存储。仍可自由观察和保存照片。");
+      return null;
+    }
+  }
+  $("#save-view").addEventListener("click", () => {
+    const observation = {
+      version: OBSERVATION_VERSION, settings: normalizeSettings(state), savedAt: new Date().toISOString(),
+      simulationTime: time, constructionTime, constructionTimeline: OBSERVATION_TIMELINE, fleetTime: fleetRouteTime, weatherTime, loaderActivity,
+      cameraPosition: camera.position.toArray(), cameraTarget: controls.target.toArray(),
+    };
+    try { localStorage.setItem(OBSERVATION_KEY, JSON.stringify(observation)); refreshStorageStatus("此刻已保存。恢复时会先暂停，等你继续。"); }
+    catch { setText("#storage-status", "这次没有存下：浏览器本地存储不可用或已满。可以先用“留影”保存照片。"); }
+  });
+  $("#restore-view").addEventListener("click", () => {
+    const saved = refreshStorageStatus();
+    if (!saved) return;
+    endTour(false);
+    Object.assign(state, saved.settings, { paused: true, resetTransition: 0 });
+    if (reducedMotion.matches) state.orbit = false;
+    time = saved.simulationTime; constructionTime = saved.constructionTime; weatherTime = saved.weatherTime;
+    fleetRouteTime = saved.fleetTime; fleetLastTime = time; loaderLastTime = time; loaderActivity = saved.loaderActivity;
+    clearCameraInertia();
+    camera.position.fromArray(saved.cameraPosition); controls.target.fromArray(saved.cameraTarget); cameraTransition = null; controls.update();
+    updateConstruction(constructionTime); applyQuality(); syncControls(); updateFieldbook();
+    settingsDialog.close(); canvas.focus({ preventScroll: true });
+    toast("已恢复保存的观察。点击继续，让这个瞬间重新动起来。");
+  });
+  $("#forget-view").addEventListener("click", () => {
+    try { localStorage.removeItem(OBSERVATION_KEY); refreshStorageStatus("已移除保存的观察，当前场景不受影响。"); }
+    catch { setText("#storage-status", "浏览器没有允许修改本地存储，观察仍保留。"); }
+  });
+  $("#reset-scene").addEventListener("click", () => { settingsDialog.close(); resetDialog.showModal(); });
+  $("#reset-cancel").addEventListener("click", () => resetDialog.close());
+  $("#reset-confirm-button").addEventListener("click", () => {
+    endTour(false);
+    Object.assign(state, DEFAULT_SETTINGS, { paused: reducedMotion.matches, cycle: !reducedMotion.matches, resetTransition: 0 });
+    time = 0; constructionTime = 0; weatherTime = 0; fleetRouteTime = 0; fleetLastTime = null; loaderLastTime = null; loaderActivity = 0;
+    for (const machine of trucks) for (const axle of machine.wheels) axle.rotation.x = 0;
+    for (const axle of loaderWheels) axle.rotation.x = 0;
+    updateConstruction(0); applyQuality(); setCameraPreset("overview"); syncControls(); updateFieldbook();
+    resetDialog.close(); canvas.focus({ preventScroll: true }); toast("新一轮小工地开始了。保存的观察还在。");
+  });
+  $("#capture").addEventListener("click", () => {
+    const button = $("#capture");
+    if (state.contextLost || state.renderFailed) { toast(state.contextLost ? "三维画面正在恢复，暂时无法留影。恢复后再试一次。" : "当前三维画面无法绘制，请重新载入后再留影。"); return; }
+    button.disabled = true;
+    try {
+      camera.clearViewOffset();
+      renderer.render(scene, camera);
+      const photograph = document.createElement("canvas");
+      const scale = Math.min(1, 2400 / canvas.width);
+      photograph.width = Math.round(canvas.width * scale);
+      const imageHeight = Math.round(canvas.height * scale), compactCaption = photograph.width < 550;
+      const footerHeight = compactCaption ? 70 : Math.max(62, Math.round(photograph.width * .048));
+      photograph.height = imageHeight + footerHeight;
+      const context = photograph.getContext("2d");
+      if (!context) throw new Error("The photo canvas is unavailable.");
+      context.drawImage(canvas, 0, 0, photograph.width, imageHeight);
+      context.fillStyle = "#202a31"; context.fillRect(0, imageHeight, photograph.width, footerHeight);
+      const pad = Math.max(18, photograph.width * .022), fontSize = Math.max(11, Math.round(photograph.width * .012));
+      context.fillStyle = "#d9b86d"; context.font = `500 ${fontSize}px monospace`; context.textBaseline = "middle";
+      context.fillText("LITTLE WORKS / SITE 001", pad, imageHeight + footerHeight * (compactCaption ? .33 : .5));
+      const caption = `${getChapter(state.buildProgress).short} · ${Math.round(state.buildProgress * 100)}% · ${formatSceneTime(state.time)} · ${state.rain ? "雨天" : "晴朗"}`;
+      context.fillStyle = "#bccdd5"; context.textAlign = compactCaption ? "left" : "right"; context.font = `${fontSize}px sans-serif`;
+      context.fillText(caption, compactCaption ? pad : photograph.width - pad, imageHeight + footerHeight * (compactCaption ? .72 : .5));
+      const filename = `little-works-${getChapter(state.buildProgress).id}-${formatSceneTime(state.time).replace(":", "")}.png`;
+      photograph.toBlob(blob => {
+        let url, link;
+        try {
+          if (!blob) { toast("这次照片没有生成，请再留影一次。"); return; }
+          url = URL.createObjectURL(blob); link = document.createElement("a");
+          link.href = url; link.download = filename; link.hidden = true;
+          document.body.append(link);
+          link.click();
+          toast("照片已生成。看看浏览器的下载记录。");
+        } catch { toast("无法下载照片，可以独立打开沙盘后再留影一次。"); }
+        finally {
+          button.disabled = false;
+          link?.remove();
+          // Download handling is asynchronous, especially in Safari. Keep the
+          // object URL alive long enough for the browser to consume the image.
+          if (url) setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }
+      }, "image/png");
+    } catch { button.disabled = false; toast("无法生成照片，请重新载入场景后再试。"); }
+    finally { frameAroundFieldbook(); }
+  });
+  $("#fullscreen").disabled = !document.fullscreenEnabled;
+  if (!document.fullscreenEnabled) $("#fullscreen").title = "此浏览器不支持内嵌全屏，可从桌面独立打开沙盘";
+  $("#fullscreen").addEventListener("click", async () => {
+    const exiting = !!document.fullscreenElement;
+    try { if (exiting) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }
+    catch { toast(exiting ? "暂时无法退出全屏，可以按 Esc 退出。" : "浏览器没有开启全屏，可以从桌面独立打开沙盘。"); }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const active = !!document.fullscreenElement;
+    $("#fullscreen").setAttribute("aria-pressed", String(active));
+    $("#fullscreen").title = active ? "退出全屏" : "全屏观察";
+    $("#fullscreen span").textContent = active ? "退出" : "全屏";
+  });
   const initialBuildTime = Number(query.get("buildTime"));
-  let last = 0, time = Number.isFinite(initialBuildTime) ? initialBuildTime : 0, weatherTime = 0, sampleTime = 0, sampleFrames = 0, budgetSamples = 0;
-  const buildCycleSeconds = 210;
-  const buildPhases = [
-    { end: .18, name: "基坑与测量" },
-    { end: .38, name: "基础与钢筋" },
-    { end: .78, name: "主体结构" },
-    { end: .92, name: "安装与收尾" },
-    { end: .97, name: "完工验收" },
-    { end: 1, name: "新工期转场" },
-  ];
+  let last = 0, time = Number.isFinite(initialBuildTime) ? Math.max(0, initialBuildTime) : 0, constructionTime = time, weatherTime = 0, budgetSamples = 0;
+  const buildCycleSeconds = BUILD_CYCLE_SECONDS;
   const manualBuildPhases = [
     { end: .18, name: "基坑与测量" },
     { end: .38, name: "基础与钢筋" },
     { end: .78, name: "主体结构" },
-    { end: .92, name: "安装与收尾" },
-    { end: 1.01, name: "完工验收" },
+    { end: .82, name: "主体封顶" },
+    { end: .88, name: "外墙与粉刷" },
+    { end: .925, name: "门窗安装" },
+    { end: .975, name: "装修与设备" },
+    { end: 1.01, name: "竣工交付" },
   ];
   const districtPhases = [
     { id: "earthworks", name: "基坑区", start: 0, end: .34 },
     { id: "west-logistics", name: "西侧后勤区", start: .1, end: .58 },
-    { id: "structure", name: "主体结构区", start: .14, end: .92 },
+    { id: "structure", name: "主体与装修区", start: .14, end: .975 },
     { id: "north-utilities", name: "北侧管线区", start: .28, end: .82 },
     { id: "east-precast", name: "东侧预制区", start: .44, end: .97 },
   ];
   function updateConstruction(simulationTime) {
-    const cycle = ((simulationTime % buildCycleSeconds) + buildCycleSeconds) % buildCycleSeconds;
-    const cyclePosition = cycle / buildCycleSeconds;
-    const autoProgress = cyclePosition < .92
-      ? cyclePosition / .92
-      : cyclePosition < .97
-        ? 1
-        : 1 - smooth01((cyclePosition - .97) / .03);
-    state.buildProgress = state.buildMode === "manual"
-      ? state.manualBuild
-      : autoProgress;
-    state.resetTransition = state.buildMode === "auto" && cyclePosition >= .97
-      ? smooth01((cyclePosition - .97) / .03)
-      : 0;
-    const phases = state.buildMode === "manual"
-      ? manualBuildPhases
-      : buildPhases;
-    const phasePosition = state.buildMode === "manual"
-      ? state.buildProgress
-      : cyclePosition;
-    state.buildPhase = phases.find(phase => phasePosition < phase.end)?.name ?? phases[0].name;
+    const { cyclePosition, progress, resetTransition } = constructionAt(simulationTime, state.buildMode, state.manualBuild);
+    state.buildProgress = progress;
+    state.resetTransition = resetTransition;
+    state.buildPhase = state.buildMode === "auto" && cyclePosition >= BUILD_RESET_START
+      ? "新工期转场"
+      : manualBuildPhases.find(phase => progress < phase.end)?.name ?? "竣工交付";
     metrics.construction = {
       cycleSeconds: buildCycleSeconds,
       cyclePosition,
@@ -1592,12 +2180,23 @@ function initialize() {
   const projection = new THREE.Vector3();
   function render(now) {
     requestAnimationFrame(render);
+    if (document.hidden || state.externalPause || state.contextLost || state.renderFailed) { last = now; frameSampler.reset(); return; }
+    if (qualityProfile.fps === 30) {
+      const interval = 1000 / 30, elapsed = now - fpsThrottle;
+      if (elapsed < interval - .5) return;
+      // Carry the remainder: small rAF jitter must not repeatedly turn two
+      // display frames into three and drag the lightweight mode below 30 fps.
+      fpsThrottle += Math.max(1, Math.floor((elapsed + .5) / interval)) * interval;
+    } else fpsThrottle = now;
+    if (state.paused !== lastSamplePaused) { frameSampler.reset(); lastSamplePaused = state.paused; }
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
-    if (document.hidden || state.externalPause) return;
-    if (!state.paused) time += dt * state.speed;
-    weatherTime += dt;
-    if (state.cycle && !state.paused) state.time = (state.time + dt / 150) % 1;
-    updateConstruction(time);
+    if (!state.paused) {
+      time += dt * state.speed;
+      weatherTime += dt * state.speed;
+      if (state.buildMode === "auto") constructionTime += dt * state.speed;
+      if (state.cycle) state.time = (state.time + dt * state.speed / 150) % 1;
+    }
+    updateConstruction(constructionTime);
     const lighting = sampleLighting(state.time);
     const { from, to, mix } = lighting;
     lightingSky.copy(from.sky).lerp(to.sky, mix);
@@ -1638,6 +2237,8 @@ function initialize() {
       zones: [],
     };
     for (const fn of dynamic) fn(time);
+    officeNight.mesh.visible = officeNight.visible > 0 && lampFactor > .12;
+    officeNightMaterial.color.setScalar(.32 + lampFactor * .68);
     const phaseLabel = state.time < .125 || state.time >= .875
       ? "夜晚"
       : state.time < .375
@@ -1651,26 +2252,45 @@ function initialize() {
       metrics.activity.dumpTrucks +
       metrics.activity.mixerTrucks +
       metrics.activity.loader;
-    document.querySelector("#phase-label").textContent = phaseLabel;
-    document.querySelector("#build-label").textContent = `${state.buildPhase} · ${Math.round(state.buildProgress * 100)}%`;
     const activeDistricts = metrics.districts.filter(
       district => district.status === "active",
     ).length;
-    document.querySelector("#activity-label").textContent = state.paused
-      ? "设备已暂停"
-      : `${activeDistricts} 区 · ${metrics.activity.workers} 人 / ${activeMachines} 台`;
+    if (now - lastUiTime > 120) {
+      setText("#phase-label", phaseLabel);
+      setText("#clock-label", formatSceneTime(state.time));
+      setText("#build-label", `${state.buildPhase} · ${Math.round(state.buildProgress * 100)}%`);
+      setText("#activity-label", state.paused ? "世界已暂停 · 镜头可自由移动" : `${activeDistricts} 区作业 · ${metrics.activity.workers} 人 / ${activeMachines} 台`);
+      setText("#build-progress-label", `${Math.round(state.buildProgress * 100)}%`);
+      buildRange.setAttribute("aria-valuetext", `${getChapter(state.buildProgress).short}，施工进度 ${Math.round(state.buildProgress * 100)}%`);
+      if (document.activeElement !== buildRange) buildRange.value = Math.round(state.buildProgress * 100);
+      if (document.activeElement !== dayRange) dayRange.value = getSceneMinute(state.time);
+      setText("#day-progress-label", formatSceneTime(state.time));
+      dayRange.setAttribute("aria-valuetext", formatSceneTime(state.time));
+      if (state.cycle) timeInput.value = "custom";
+      updateFieldbook();
+      lastUiTime = now;
+    }
     dustMaterial.uniforms.time.value = time; dustMaterial.uniforms.intensity.value = state.rain ? .03 : Math.max(state.dust, state.resetTransition * 1.25);
     rain.visible = state.rain;
-    if (state.rain) {
-      for (let i = 0; i < rainSeeds.length; i++) {
+    if (state.rain && (weatherTime !== lastRainTime || state.buildProgress !== lastRainProgress || qualityProfile.rainCount !== lastRainCount)) {
+      // Rain only meets a roof once the corresponding slab exists. Early stages
+      // must not show droplets stopping above an otherwise empty construction bay.
+      const buildingRoof = state.buildProgress > .74 ? 5.215 : state.buildProgress > .57 ? 3.565 : state.buildProgress > .4 ? 1.915 : state.buildProgress > .195 ? .24 : .04;
+      for (let i = 0; i < qualityProfile.rainCount; i++) {
         const drop = rainSeeds[i];
-        const roof = drop.x > 2.05 && drop.x < 6.95 && drop.z > -3.8 && drop.z < .7 ? 5.6 :
-          drop.x > -6.7 && drop.x < -2.3 && drop.z > 2.2 && drop.z < 4.6 ? 2.08 :
-          drop.x > -3.4 && drop.x < 3.4 && drop.z > -5.05 && drop.z < -3.45 ? 1.7 : .04;
+        let roof = drop.building ? Math.max(buildingRoof, drop.roof) : drop.roof;
+        for (const roofPart of drop.officeRoofs) {
+          if (state.buildProgress >= roofPart.stage) roof = Math.max(roof, roofPart.y);
+        }
         const y = roof + (11 - roof) - ((drop.y + weatherTime * 9) % (11 - roof));
-        rainPositions.set([drop.x, y, drop.z, drop.x - .09, y + .35, drop.z + .045], i * 6);
+        const offset = i * 6;
+        rainPositions[offset] = drop.x; rainPositions[offset + 1] = y; rainPositions[offset + 2] = drop.z;
+        rainPositions[offset + 3] = drop.x - .09; rainPositions[offset + 4] = y + .35; rainPositions[offset + 5] = drop.z + .045;
       }
+      rainGeo.attributes.position.clearUpdateRanges();
+      rainGeo.attributes.position.addUpdateRange(0, qualityProfile.rainCount * 6);
       rainGeo.attributes.position.needsUpdate = true;
+      lastRainTime = weatherTime; lastRainProgress = state.buildProgress; lastRainCount = qualityProfile.rainCount;
     }
     knobs[0].rotation.y = -state.speed * 2.1; knobs[1].rotation.y = state.cycle ? -.7 : .7; knobs[2].rotation.y = -state.dust * 2.4;
     if (cameraTransition) {
@@ -1680,14 +2300,38 @@ function initialize() {
       controls.target.lerpVectors(cameraTransition.fromTarget, cameraTransition.toTarget, eased);
       if (progress === 1) cameraTransition = null;
     }
-    controls.autoRotate = !cameraTransition && performance.now() - lastInteraction > 8000 && !matchMedia("(prefers-reduced-motion: reduce)").matches;
-    controls.update();
-    renderer.render(scene, camera);
+    controls.autoRotate = state.orbit && !state.paused && !cameraTransition && !settingsDialog.open && !resetDialog.open && performance.now() - lastInteraction > 5000 && !reducedMotion.matches;
+    controls.update(dt);
+    try { renderer.info.reset(); renderer.render(scene, camera); }
+    catch (error) {
+      state.renderFailed = true;
+      showSceneError("三维画面暂时无法绘制。请重新载入沙盘；已经保存的观察仍保留在这台设备。");
+      console.error("Little Works rendering failed:", error);
+      return;
+    }
+    // Creating or restoring a WebGL context does not prove it can draw. Only
+    // clear the fallback and tell the desktop it is ready after a real frame.
+    showSceneReady();
+    if (state.labels) {
+      for (const marker of markerButtons) {
+        projection.copy(marker.point).project(camera);
+        const x = (projection.x + 1) / 2 * innerWidth, y = (1 - projection.y) / 2 * innerHeight;
+        marker.button.hidden = projection.z > 1 || projection.z < -1 || x < 20 || x > innerWidth - 65 || y < 104 || y > innerHeight - 110;
+        if (!marker.button.hidden) marker.button.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px) translate(-50%,-50%)`;
+      }
+    }
     metrics.frame++; metrics.calls = renderer.info.render.calls; metrics.triangles = renderer.info.render.triangles;
-    sampleFrames++; sampleTime += dt;
-    if (sampleTime > 1.5) {
-      metrics.fps = Math.round(sampleFrames / sampleTime);
-      document.querySelector("#fps-label").textContent = `${metrics.fps} FPS`;
+    metrics.clocks = { simulation: time, construction: constructionTime, fleet: fleetRouteTime, weather: weatherTime };
+    projection.copy(controls.target).project(camera);
+    metrics.camera = { position: camera.position.toArray(), target: controls.target.toArray(), preset: state.camera, horizontalOffset: camera.view?.enabled ? camera.view.offsetX : 0, focusScreen: { x: (projection.x + 1) / 2 * innerWidth, y: (1 - projection.y) / 2 * innerHeight } };
+    metrics.observation = { activeTab, tourIndex, zone: selectedZone.id, fieldbookOpen: !fieldbook.hidden, paused: state.paused };
+    const frameSample = frameSampler.sample(now);
+    if (frameSample) {
+      metrics.fps = Math.round(frameSample.fps);
+      metrics.performance = { ...frameSample, ...renderer.info.memory, includesShadows: true };
+      setText("#fps-label", `${metrics.fps} FPS · ${renderer.getPixelRatio().toFixed(1)}× 分辨率 · ${metrics.calls} 次绘制（含阴影）`);
+      setText("#frame-time-label", `帧间隔 ${frameSample.averageFrameMs.toFixed(1)} ms · P95 ${frameSample.p95FrameMs.toFixed(1)} ms`);
+      setText("#render-budget-label", `${metrics.triangles.toLocaleString("en-US")} 三角形 · ${renderer.info.memory.geometries} 几何资源 · ${renderer.info.memory.textures} 纹理`);
       metrics.lighting = {
         phase: phaseLabel,
         sky: `#${scene.background.getHexString()}`,
@@ -1697,16 +2341,34 @@ function initialize() {
         exposure: renderer.toneMappingExposure,
       };
       metrics.knobs = knobs.map((knob, i) => { knob.getWorldPosition(projection); projection.project(camera); return { id: i, x: (projection.x + 1) / 2 * innerWidth, y: (1 - projection.y) / 2 * innerHeight }; });
-      if (++budgetSamples > 2 && metrics.fps < 45 && renderer.getPixelRatio() > 1) renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() - .2));
-      sampleTime = 0; sampleFrames = 0;
+      if (state.quality === "auto" && ++budgetSamples > 2 && metrics.fps < 42 && renderer.getPixelRatio() > 1) {
+        renderer.setPixelRatio(Math.max(1, renderer.getPixelRatio() - .15));
+        dustMaterial.uniforms.ratio.value = renderer.getPixelRatio();
+        metrics.quality.pixelRatio = renderer.getPixelRatio();
+      }
     }
   }
   window.addEventListener("resize", () => {
-    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
-    resetCamera();
+    camera.aspect = innerWidth / innerHeight; camera.fov = getSceneFov(innerWidth, innerHeight); camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
+    scene.fog.density = camera.aspect < .75 ? .009 : .012;
+    if (state.camera !== "custom") setCameraPreset(state.camera);
+    if (innerWidth <= 650) setBook(false);
+    frameAroundFieldbook();
+    applyQuality();
+    revealActiveChapter();
     lastInteraction = performance.now();
   });
-  canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); errorBox.hidden = false; errorBox.textContent = "WebGL 上下文已丢失，请刷新沙盘恢复。"; });
+  canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); state.contextLost = true; showSceneError("三维画面暂时中断了。重新载入可以恢复；已保存的观察仍保留在这台设备。"); });
+  canvas.addEventListener("webglcontextrestored", () => { state.contextLost = false; state.renderFailed = false; last = performance.now(); fpsThrottle = 0; frameSampler.reset(); });
+  document.addEventListener("visibilitychange", () => { last = performance.now(); frameSampler.reset(); });
+  selectZone(SITE_ZONES[0].id, false);
+  setBook(innerWidth >= 850 && query.get("book") !== "0");
+  updateConstruction(constructionTime);
+  applyQuality();
+  refreshStorageStatus();
   syncControls();
+  updateFieldbook();
+  if (state.camera !== "overview") setCameraPreset(state.camera);
+  if (query.get("tour") === "1") showTourStop(0);
   requestAnimationFrame(render);
 }

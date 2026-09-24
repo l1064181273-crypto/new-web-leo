@@ -28,6 +28,11 @@ test("desktop icons share one frame and custom positions persist", async ({
       }),
     ),
   ).toBe(true);
+  for (const image of await page.locator(".desktop-shortcut:visible .desktop-icon-frame img").all()) {
+    await expect.poll(() => image.evaluate((element: HTMLImageElement) =>
+      element.complete && element.naturalWidth > 0 && element.naturalHeight > 0,
+    )).toBe(true);
+  }
   const visibleSizes = await page
     .locator(".desktop-shortcut:visible .desktop-icon-frame img")
     .evaluateAll((images) =>

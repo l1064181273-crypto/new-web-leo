@@ -1,0 +1,195 @@
+/* Quiet shell refinements: preserve small traffic-light dots, enlarge their
+   actual targets, and keep all overrides local to the V2 desktop or its portals. */
+.leo-desktop.studio-v2 .desktop-window .window-inner > .window-titlebar {
+  grid-template-columns: 84px minmax(0, 1fr) 68px;
+  gap: 8px;
+}
+
+.leo-desktop.studio-v2 .desktop-window .traffic-lights {
+  gap: 0 !important;
+}
+
+.leo-desktop.studio-v2 .desktop-window .traffic-lights button {
+  position: relative;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #603329;
+}
+
+.leo-desktop.studio-v2 .desktop-window .traffic-lights button::before {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #0002;
+  border-radius: 50%;
+  background: var(--traffic-color);
+}
+
+.leo-desktop.studio-v2 .traffic-close { --traffic-color: #ff6058; }
+.leo-desktop.studio-v2 .traffic-minimize { --traffic-color: #febc2e; }
+.leo-desktop.studio-v2 .traffic-maximize { --traffic-color: #29c840; }
+
+.leo-desktop.studio-v2 .desktop-window .traffic-lights svg {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+}
+
+.leo-desktop.studio-v2 .desktop-window .traffic-lights:focus-within svg,
+.leo-desktop.studio-v2 .desktop-window .traffic-lights:hover svg {
+  opacity: 0.8;
+}
+
+.leo-desktop.studio-v2 .window-path {
+  min-width: 0;
+}
+
+.leo-desktop.studio-v2 .window-path strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.leo-desktop.studio-v2 .window-inner:focus-visible {
+  outline: 2px solid #5b8cc1;
+  outline-offset: -2px;
+}
+
+.leo-desktop.studio-v2 .desktop-popover {
+  max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - 64px);
+  overflow: auto;
+}
+
+.leo-desktop.studio-v2 .desktop-popover h2 {
+  padding-right: 24px;
+}
+
+.leo-desktop.studio-v2 .desktop-popover-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  color: #697b88;
+  background: transparent;
+}
+
+.leo-desktop.studio-v2 .desktop-popover-close:hover {
+  color: #244a68;
+  background: #dfe9f0;
+}
+
+.leo-desktop.studio-v2 .desktop-popover:focus-visible,
+.desktop-guide button:focus-visible,
+.spotlight-panel button:focus-visible {
+  outline: 3px solid #5b8cc1;
+  outline-offset: 2px;
+}
+
+.spotlight-panel.spotlight-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(65vh, calc(100dvh - 32px));
+}
+
+.spotlight-panel.spotlight-panel > label,
+.spotlight-panel .spotlight-hint {
+  flex-shrink: 0;
+}
+
+.spotlight-panel.spotlight-panel > label:focus-within {
+  box-shadow: inset 0 -2px #5b8cc1;
+}
+
+.spotlight-panel.spotlight-panel > .spotlight-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+
+.spotlight-panel .spotlight-results [aria-selected="true"] {
+  color: #20384a;
+  background: #e4edf4;
+  box-shadow: inset 3px 0 #5b8cc1;
+}
+
+.spotlight-panel .spotlight-results button:hover {
+  color: #20384a;
+  background: #e4edf4;
+}
+
+.spotlight-panel .spotlight-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px 7px 18px;
+  color: #667b8a;
+}
+
+.spotlight-panel .spotlight-close {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  color: #697b88;
+}
+
+.spotlight-panel .spotlight-empty {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .leo-desktop.studio-v2 .desktop-window .window-inner > .window-titlebar {
+    grid-template-columns: 72px minmax(0, 1fr) 76px;
+    gap: 6px;
+    padding-inline: 10px !important;
+  }
+
+  .leo-desktop.studio-v2 .desktop-window .traffic-lights button {
+    flex-basis: 36px;
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .leo-desktop.studio-v2 .desktop-window .traffic-lights button::before {
+    width: 11px;
+    height: 11px;
+  }
+
+  .leo-desktop.studio-v2 .desktop-window .window-actions .icon-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .spotlight-panel.spotlight-panel {
+    top: max(16px, env(safe-area-inset-top));
+    max-height: calc(100dvh - 32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-guide button,
+  .spotlight-panel button {
+    transition: none;
+  }
+}
