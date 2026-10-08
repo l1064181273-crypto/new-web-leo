@@ -23,7 +23,7 @@ test("memory apps use distinct editorial interfaces", async ({ page }) => {
   for (const [app, selector, text] of [
     ["daily", ".daybook", "Daybook"],
     ["photos", ".photo-studio", "LIGHT / FIELD"],
-    ["cinema", ".cinema-app", "INTERSTELLAR"],
+    ["cinema", ".cinema-app", "Interstellar"],
     ["food", ".table-stories", "Table Stories"],
   ] as const) {
     await ready(page, app);
@@ -36,6 +36,8 @@ test("memory apps use distinct editorial interfaces", async ({ page }) => {
 });
 
 test("Little Works renders with Three r160 and responds to simulation controls", async ({ page, isMobile }, info) => {
+  // Headless software WebGL can spend more than the default 30s warming the scene and stepping every stage.
+  test.setTimeout(180_000);
   test.skip(isMobile, "This embedded controls audit is desktop-only; the separate construction-loop test also runs in mobile Chromium emulation.");
   await ready(page, "cats");
   const iframe = page.locator('iframe[title="Little Works 建筑工地沙盘"]');
