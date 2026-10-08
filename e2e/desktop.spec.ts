@@ -111,7 +111,8 @@ test("photography has a focused viewer, favorites and keyboard navigation", asyn
   await expect(page.getByRole("dialog", { name: "欧式校园", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(photography).toBeVisible();
-  await expect(photography.getByRole("button", { name: "放大 暮色苍山", exact: true })).toBeFocused();
+  // Arrowing inside the viewer updates this same button's name to the photo now on stage.
+  await expect(photography.getByRole("button", { name: "放大 欧式校园", exact: true })).toBeFocused();
   await page.reload();
   await expect(photography.getByRole("button", { name: "取消收藏照片", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
@@ -145,6 +146,12 @@ test("reference overlays keep one app visible and return to the desktop", async 
   await expect(atlas.getByLabel("搜索收藏")).toHaveValue("苍山");
   await expect(page.locator(".desktop-window:visible")).toHaveCount(1);
   if (!isMobile) {
+    // window-arrive scales the frame for 0.23s. Measure the settled box, not a mid-animation one.
+    await atlas.evaluate((element) =>
+      Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      ),
+    );
     const original = (await atlas.boundingBox())!;
     await atlas.getByRole("button", { name: "放大窗口", exact: true }).click();
     await expect(atlas.getByRole("button", { name: "还原窗口", exact: true })).toHaveAttribute("aria-pressed", "true");
