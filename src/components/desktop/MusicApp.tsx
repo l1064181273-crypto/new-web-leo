@@ -80,12 +80,19 @@ export default function MusicApp() {
     invalidatePlayback();
     playIntent.current = false;
     audio.pause();
-    audio.src = sourceUrl;
-    audio.load();
     setPlaying(false); setCurrent(0); setDuration(0); setError(""); setPending(false);
-    if (autoplay.current) { autoplay.current = false; void playAudio(); }
+    if (autoplay.current) {
+      autoplay.current = false;
+      void playAudio();
+    } else if (source === "chart") {
+      // preload="none" still fetches once src is assigned. Keep the ~1MB
+      // iTunes preview off the element until the user actually plays.
+      audio.removeAttribute("src");
+    } else {
+      audio.src = sourceUrl;
+    }
     return () => { invalidatePlayback(); playIntent.current = false; releaseAudio(audio); };
-  }, [sourceUrl, playAudio, invalidatePlayback]);
+  }, [source, sourceUrl, playAudio, invalidatePlayback]);
 
   useEffect(() => { if (audioRef.current) audioRef.current.volume = preferences.volume; }, [preferences.volume, sourceUrl]);
   useEffect(() => {
@@ -164,7 +171,7 @@ export default function MusicApp() {
         <div className="ipod-screen">
           <div className="ipod-status"><strong>Leo's iPod</strong><span>{source === "chart" ? `#${track.rank}` : "LOCAL"} ▰</span></div>
           {menu ? <div className="ipod-menu"><button onClick={() => setMenu(false)}>返回播放器 <span>›</span></button><button onClick={() => changeSource(source === "chart" ? "ambient" : "chart")}>{source === "chart" ? "本站背景音" : "榜单试听"}<span>›</span></button>{source === "chart" && <a href={track.url} target="_blank" rel="noopener noreferrer">官方收听 <span>↗</span></a>}<p>{source === "chart" ? "BILLBOARD 2024 · PREVIEWS" : "LOCAL BACKGROUND CLIP"}</p></div> : <>
-            <div className="ipod-track"><CollectionThumbnail item={cover} slot="ipod" alt="桌面封面：海边路灯" lazy={false} /><div><strong title={trackTitle}>{trackTitle}</strong><span title={trackArtist}>{trackArtist}</span><small>{source === "chart" ? "iTunes 官方试听片段" : "可循环的背景音片段"}</small></div></div>
+            <div className="ipod-track"><CollectionThumbnail item={cover} slot="ipod" alt="桌面封面：海边路灯" /><div><strong title={trackTitle}>{trackTitle}</strong><span title={trackArtist}>{trackArtist}</span><small>{source === "chart" ? "iTunes 官方试听片段" : "可循环的背景音片段"}</small></div></div>
             <input className="ipod-seek" type="range" aria-label="播放进度" aria-valuetext={`${playbackTime(current)} / ${playbackTime(duration)}`} min={0} max={duration || 1} step={.1} value={Math.min(current, duration || 1)} onChange={event => seek(Number(event.target.value))} disabled={!duration} /><div className="ipod-times"><span>{playbackTime(current)}</span><span>{duration ? playbackTime(duration) : "--:--"}</span></div>
           </>}
         </div>

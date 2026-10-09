@@ -39,7 +39,7 @@ export default function StudioProfile({ open }: { open: (id: AppId) => void }) {
         </div>
         <div className="studio-profile-portrait">
           <div className="portrait-orbit" />
-          <img src={avatar} alt="Haonan 的三维风格头像" />
+          <img src={avatar} alt="Haonan 的三维风格头像" loading="lazy" decoding="async" />
           <span>CURIOUS BY DEFAULT.</span>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default function StudioProfile({ open }: { open: (id: AppId) => void }) {
         </button>
       </div>
       <div className="studio-profile-postcard">
-        <img src={sea} alt="收藏中的海边路灯" loading="lazy" />
+        <img src={sea} alt="收藏中的海边路灯" loading="lazy" decoding="async" />
         <div>
           <span>A SMALL REMINDER</span>
           <p>

@@ -1001,3 +1001,104 @@ describe("desktop shell accessibility regressions", () => {
     ).toHaveClass("app-cats");
   });
 });
+
+describe("desktop window history", () => {
+  const appParam = () => new URL(window.location.href).searchParams.get("app");
+
+  it("pushes an app query, lets Back close the topmost window, and lets Forward reopen it", async () => {
+    window.history.replaceState({ utm: "keep" }, "", "/?utm=newsletter");
+    await startDesktop();
+    fireEvent.click(shortcut("profile"));
+    await settle();
+    expect(appParam()).toBe("profile");
+    expect(window.location.search).toContain("utm=newsletter");
+    expect(document.title).toBe("Profile · Haonan Li");
+    fireEvent.click(shortcut("cinema"));
+    await settle();
+    expect(appParam()).toBe("cinema");
+    expect(window.location.search).toContain("utm=newsletter");
+    expect(document.title).toBe("Cinema · Haonan Li");
+    const lengthAfterOpen = window.history.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "搜索应用" }));
+    await settle();
+    fireEvent.change(searchInput(), { target: { value: "Cinema" } });
+    fireEvent.keyDown(searchInput(), { key: "Enter" });
+    await settle();
+    expect(window.history.length).toBe(lengthAfterOpen);
+
+    window.history.back();
+    await settle();
+    expect(appParam()).toBe("profile");
+    expect(screen.getByRole("dialog", { name: "Profile 窗口" })).toBeVisible();
+    expect(document.querySelector(".app-cinema")).toBeNull();
+    expect(document.title).toBe("Profile · Haonan Li");
+
+    window.history.forward();
+    await settle();
+    expect(appParam()).toBe("cinema");
+    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
+    expect(document.title).toBe("Cinema · Haonan Li");
+  });
+
+  it("goes back when the window is closed or dismissed, and replaces a deep link instead of leaving the site", async () => {
+    const view = await startDesktop();
+    fireEvent.click(shortcut("notes"));
+    await settle();
+    fireEvent.keyDown(screen.getByLabelText("Test note body"), { key: "Escape" });
+    await settle();
+    expect(screen.queryByRole("dialog", { name: "Field Notes 窗口" })).not.toBeInTheDocument();
+    expect(appParam()).toBeNull();
+    expect(document.title).toBe("Haonan Li · Personal Desktop");
+
+    window.history.forward();
+    await settle();
+    expect(appParam()).toBe("notes");
+    expect(screen.getByRole("dialog", { name: "Field Notes 窗口" })).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭窗口" }));
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(document.querySelector(".app-notes")).toBeNull();
+    view.unmount();
+
+    window.history.replaceState(null, "", "/?app=cinema&collection=films");
+    const length = window.history.length;
+    const { unmount } = render(
+      <BrowserRouter>
+        <Index />
+      </BrowserRouter>,
+    );
+    await settle();
+    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
+    expect(window.history.length).toBe(length);
+    fireEvent.click(screen.getByRole("button", { name: "关闭窗口" }));
+    await settle();
+    expect(window.history.length).toBe(length);
+    expect(appParam()).toBeNull();
+    expect(window.location.search).toContain("collection=films");
+    expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
+    unmount();
+  });
+
+  it("returns to the desktop on the mobile home control and reopens that app with Forward", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      writable: true,
+      value: 390,
+    });
+    await startDesktop();
+    fireEvent.click(shortcut("cinema"));
+    await settle();
+    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toHaveAttribute("aria-modal", "true");
+    fireEvent.click(screen.getByRole("button", { name: "回到桌面" }));
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
+    expect(document.querySelector(".desktop-shortcuts")).not.toHaveAttribute("inert");
+    window.history.forward();
+    await settle();
+    expect(appParam()).toBe("cinema");
+    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
+  });
+});
