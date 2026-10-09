@@ -14,7 +14,7 @@
     { "source": "/music", "destination": "/index.html" },
     { "source": "/film", "destination": "/index.html" },
     { "source": "/food", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

@@ -33,6 +33,7 @@ const staticPaths = [
 ];
 
 function matches(source: string, path: string) {
+  if (source === "/((?!assets/).*)") return /^\/((?!assets\/).*)$/.test(path);
   const pattern = source
     .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     .replace("\\(\\.\\*\\)", "(.*)");
@@ -48,7 +49,20 @@ describe("vercel routing", () => {
   it("keeps the legacy rewrites and falls back to the SPA after them", () => {
     expect(config.rewrites.slice(0, legacyPaths.length).map((rule) => rule.source)).toEqual(legacyPaths);
     expect(config.rewrites.slice(0, legacyPaths.length).every((rule) => rule.destination === "/index.html")).toBe(true);
-    expect(config.rewrites.at(-1)).toEqual({ source: "/(.*)", destination: "/index.html" });
+    expect(config.rewrites.at(-1)).toEqual({
+      source: "/((?!assets/).*)",
+      destination: "/index.html",
+    });
+  });
+
+  it("does not rewrite missing hashed assets to index.html", () => {
+    const destination = (path: string) =>
+      config.rewrites.find((rule) => matches(rule.source, path))?.destination;
+    expect(destination("/abc")).toBe("/index.html");
+    expect(destination("/photos")).toBe("/index.html");
+    expect(destination("/construction-sandbox.html")).toBe("/index.html");
+    expect(destination("/assets/missing-abc123.js")).toBeUndefined();
+    expect(destination("/assets/")).toBeUndefined();
   });
 
   it("caches hashed assets immutably, unhashed images for a week, and revalidates html", () => {

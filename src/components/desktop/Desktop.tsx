@@ -280,6 +280,23 @@ function historyOwnsAppEntry() {
   return state?.desktopApp === true;
 }
 
+function stripAppParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("app")) return false;
+  url.searchParams.delete("app");
+  const previous = window.history.state;
+  const state =
+    previous && typeof previous === "object"
+      ? { ...previous, desktopApp: false }
+      : previous;
+  window.history.replaceState(
+    state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+  return true;
+}
+
 export default function Desktop({
   initialApp,
   initialCollection,
@@ -345,6 +362,8 @@ export default function Desktop({
   const launchedAppRef = useRef<AppId | null>(null);
   const activeIdRef = useRef<AppId | null>(null);
   const historyNavPending = useRef(false);
+  const dismissToDesktop = useRef(false);
+  const navigationGeneration = useRef(0);
   const openRef = useRef<(id: AppId, source?: "user" | "history") => void>(
     () => {},
   );
@@ -455,21 +474,18 @@ export default function Desktop({
     },
     [changeSurface, restoreSurfaceFocus],
   );
-  const retreatAppHistory = useCallback(() => {
+  const retreatAppHistory = useCallback((toDesktop = false) => {
     if (historyOwnsAppEntry()) {
       if (historyNavPending.current) return;
       historyNavPending.current = true;
+      // Minimize / Esc / 回到桌面 must land on the desktop. Back may reveal
+      // the previous app; popstate drops that ?app= instead of reopening it.
+      dismissToDesktop.current = toDesktop;
       window.history.back();
       return;
     }
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("app")) return;
-    url.searchParams.delete("app");
-    window.history.replaceState(
-      window.history.state,
-      "",
-      `${url.pathname}${url.search}${url.hash}`,
-    );
+    dismissToDesktop.current = false;
+    stripAppParam();
   }, []);
   const open = (id: AppId, source: "user" | "history" = "user") => {
     const isGallery = id === "atlas" || !!appById[id].collection;
@@ -514,6 +530,8 @@ export default function Desktop({
       if (current !== id) {
         // A newer visit supersedes a back() that has not fired yet.
         historyNavPending.current = false;
+        dismissToDesktop.current = false;
+        navigationGeneration.current += 1;
         const previous = window.history.state;
         const state =
           previous && typeof previous === "object"
@@ -538,13 +556,13 @@ export default function Desktop({
   const close = (id: AppId) => {
     dispatch({ type: "close", id });
     restoreDesktopFocus(id);
-    retreatAppHistory();
+    retreatAppHistory(false);
   };
   const dismiss = () => {
     if (active) {
       dispatch({ type: "minimize", id: active.id });
       restoreDesktopFocus(active.id);
-      retreatAppHistory();
+      retreatAppHistory(true);
     }
   };
   useEffect(() => {
@@ -587,7 +605,7 @@ export default function Desktop({
         event.preventDefault();
         dispatch({ type: "minimize", id: active.id });
         restoreDesktopFocus(active.id);
-        retreatAppHistory();
+        retreatAppHistory(true);
       }
     };
     window.addEventListener("keydown", keyboard);
@@ -652,19 +670,42 @@ export default function Desktop({
     };
   }, []);
   useEffect(() => {
-    if (applications.some((app) => app.id === initialApp))
+    if (applications.some((app) => app.id === initialApp)) {
+      if (dismissToDesktop.current) return;
       open(initialApp as AppId, "history");
+    }
     // Open on app-query changes, not on resize; collection-query changes are
     // independently reflected by atlasCollection without reopening the window.
     // Deep links already own the URL, so this path must not push another entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialApp]);
   useEffect(() => {
+    const onPopStateCapture = () => {
+      // Run before the router reads the URL. A desktop dismissal that lands
+      // on another ?app= must become a desktop entry, not a reopened window.
+      if (dismissToDesktop.current) stripAppParam();
+    };
     const onPopState = () => {
       const fromUi = historyNavPending.current;
+      const toDesktop = dismissToDesktop.current;
       historyNavPending.current = false;
       const next = readAppParam();
       const current = activeIdRef.current;
+      if (fromUi && toDesktop) {
+        // Keep the flag set until after the router effect and focus
+        // restoration, then drop any window those two reopened.
+        // A newer Back/Forward or open cancels that cleanup.
+        const generation = ++navigationGeneration.current;
+        window.setTimeout(() => {
+          if (navigationGeneration.current !== generation) return;
+          dismissToDesktop.current = false;
+          const activeId = activeIdRef.current;
+          if (activeId) dispatch({ type: "minimize", id: activeId });
+        }, 0);
+        return;
+      }
+      dismissToDesktop.current = false;
+      if (!fromUi) navigationGeneration.current += 1;
       if (fromUi) {
         if (next && next !== current) openRef.current(next, "history");
         return;
@@ -675,8 +716,12 @@ export default function Desktop({
       }
       if (next && next !== current) openRef.current(next, "history");
     };
+    window.addEventListener("popstate", onPopStateCapture, true);
     window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopStateCapture, true);
+      window.removeEventListener("popstate", onPopState);
+    };
   }, []);
   useEffect(() => {
     document.title = active
@@ -1076,6 +1121,9 @@ export default function Desktop({
                   aria-label={`${appById[id].name} 窗口`}
                   tabIndex={-1}
                   onFocusCapture={() => {
+                    // History traversal can refocus the previous window after
+                    // 回到桌面 / minimize. That must not bring the app back.
+                    if (dismissToDesktop.current) return;
                     if (active?.id !== id) dispatch({ type: "focus", id });
                   }}
                 >

@@ -5,8 +5,7 @@ import { describe, expect, it } from "vitest";
 import html from "../../index.html?raw";
 
 const canonicalOrigin = "https://www.lihaonany.me/";
-const productionOrigin = "https://lihaonany.me/";
-const previewUrl = `${productionOrigin}studio-preview-v2.png`;
+const previewUrl = `${canonicalOrigin}studio-preview-v2.png`;
 const head = new DOMParser().parseFromString(html, "text/html").head;
 
 describe("production site metadata", () => {

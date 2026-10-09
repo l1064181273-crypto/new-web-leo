@@ -1081,6 +1081,63 @@ describe("desktop window history", () => {
     unmount();
   });
 
+  it("returns to the desktop instead of the previous app when a window is dismissed", async () => {
+    await startDesktop();
+    fireEvent.click(shortcut("profile"));
+    await settle();
+    fireEvent.click(shortcut("projects"));
+    await settle();
+    expect(appParam()).toBe("projects");
+    expect(window.location.search).not.toContain("app=profile");
+
+    fireEvent.click(screen.getByRole("button", { name: "回到桌面" }));
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.title).toBe("Haonan Li · Personal Desktop");
+
+    window.history.back();
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    window.history.forward();
+    await settle();
+    expect(appParam()).toBeNull();
+    fireEvent.click(shortcut("profile"));
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "搜索应用" }));
+    await settle();
+    fireEvent.change(searchInput(), { target: { value: "Cinema" } });
+    fireEvent.keyDown(searchInput(), { key: "Enter" });
+    await settle();
+    expect(appParam()).toBe("cinema");
+    fireEvent.click(screen.getByRole("button", { name: "收起窗口" }));
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Profile 窗口" })).not.toBeInTheDocument();
+
+    window.history.forward();
+    await settle();
+    expect(appParam()).toBe("cinema");
+    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
+    fireEvent.keyDown(screen.getByRole("dialog", { name: "Cinema 窗口" }), { key: "Escape" });
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(shortcut("profile"));
+    await settle();
+    fireEvent.click(shortcut("projects"));
+    await settle();
+    window.history.back();
+    await settle();
+    expect(appParam()).toBe("profile");
+    expect(screen.getByRole("dialog", { name: "Profile 窗口" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Projects 窗口" })).not.toBeInTheDocument();
+  });
+
   it("returns to the desktop on the mobile home control and reopens that app with Forward", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,

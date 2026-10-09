@@ -49,6 +49,37 @@ test("back closes the topmost window and forward reopens it", async ({ page }) =
   await expect(page.getByRole("dialog", { name: "Profile 窗口", exact: true })).toBeVisible();
 });
 
+test("going to the desktop does not restore the app opened underneath", async ({ page }) => {
+  await ready(page);
+  const leaveDesktop = async (action: "home" | "escape" | "minimize") => {
+    await openApp(page, "Profile");
+    await page.getByRole("button", { name: /动手做点什么/ }).click();
+    await expect(page).toHaveURL(/[?&]app=projects(?:&|$)/);
+    await expect(page.getByRole("dialog", { name: "Projects 窗口", exact: true })).toBeVisible();
+    if (action === "home") {
+      await page.getByRole("button", { name: "回到桌面", exact: true }).click();
+    } else if (action === "escape") {
+      await page.keyboard.press("Escape");
+    } else {
+      await page.getByRole("button", { name: "收起窗口", exact: true }).click();
+    }
+    await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
+    await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+    await expect(page.locator(".leo-desktop")).toBeVisible();
+    await expect(page).toHaveTitle("Haonan Li · Personal Desktop");
+  };
+
+  await leaveDesktop("home");
+  await page.goBack();
+  await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
+  await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+  await expect(page.locator(".leo-desktop")).toBeVisible();
+  await page.goForward();
+
+  await leaveDesktop("escape");
+  await leaveDesktop("minimize");
+});
+
 test("a deep link stays on the site when its window is closed and keeps other query params", async ({ page }) => {
   await page.goto("/?app=cinema&collection=films");
   await expect(page.locator(".desktop-boot")).toHaveCount(0);
