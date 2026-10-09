@@ -170,6 +170,13 @@ test("reference overlays keep one app visible and return to the desktop", async 
     expect((await atlas.boundingBox())!.x).toBeGreaterThan(previous!.x + 20);
   }
   await atlas.getByRole("button", { name: "关闭窗口", exact: true }).click();
+  if (!isMobile) {
+    // Profile is still the history entry under Atlas, so closing Atlas steps back to it.
+    const profile = page.getByRole("dialog", { name: "Profile 窗口", exact: true });
+    await expect(profile).toBeVisible();
+    await expect(page.locator(".desktop-window:visible")).toHaveCount(1);
+    await profile.getByRole("button", { name: "关闭窗口", exact: true }).click();
+  }
   await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
   await page
     .getByRole("navigation", { name: "应用程序坞" })
