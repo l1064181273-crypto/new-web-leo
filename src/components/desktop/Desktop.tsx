@@ -259,6 +259,44 @@ const hasAppModal = () => Boolean(document.querySelector(
   '[role="alertdialog"], [role="dialog"]:not(.window-inner):not(.spotlight-panel):not(.desktop-guide):not(.desktop-popover)',
 ));
 
+function isAppId(value: string | null): value is AppId {
+  return Boolean(value && value in appById);
+}
+
+function readAppParam(): AppId | null {
+  const value = new URL(window.location.href).searchParams.get("app");
+  return isAppId(value) ? value : null;
+}
+
+function hrefWithApp(id: AppId | null) {
+  const url = new URL(window.location.href);
+  if (id) url.searchParams.set("app", id);
+  else url.searchParams.delete("app");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function historyOwnsAppEntry() {
+  const state = window.history.state as { desktopApp?: boolean } | null;
+  return state?.desktopApp === true;
+}
+
+function stripAppParam() {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("app")) return false;
+  url.searchParams.delete("app");
+  const previous = window.history.state;
+  const state =
+    previous && typeof previous === "object"
+      ? { ...previous, desktopApp: false }
+      : previous;
+  window.history.replaceState(
+    state,
+    "",
+    `${url.pathname}${url.search}${url.hash}`,
+  );
+  return true;
+}
+
 export default function Desktop({
   initialApp,
   initialCollection,
@@ -322,6 +360,12 @@ export default function Desktop({
   const surfaceRef = useRef<DesktopSurface>(null);
   const surfaceInvokerRef = useRef<HTMLElement | null>(null);
   const launchedAppRef = useRef<AppId | null>(null);
+  const activeIdRef = useRef<AppId | null>(null);
+  const historyNavPending = useRef(false);
+  const openRef = useRef<(id: AppId, source?: "user" | "history") => void>(
+    () => {},
+  );
+  const restoreDesktopFocusRef = useRef<(id: AppId) => void>(() => {});
   const searchListId = useId();
   const panelId = useId();
   const iconDrag = useRef<{
@@ -340,6 +384,7 @@ export default function Desktop({
   const small = viewport.width <= 720;
   const compactIcons = viewport.width < 1100;
   const active = [...windows].reverse().find((item) => !item.minimized);
+  activeIdRef.current = active?.id ?? null;
   const spotlight = surface === "search";
   const helpOpen = surface === "guide";
   const panel =
@@ -427,7 +472,16 @@ export default function Desktop({
     },
     [changeSurface, restoreSurfaceFocus],
   );
-  const open = (id: AppId) => {
+  const retreatAppHistory = useCallback(() => {
+    if (historyOwnsAppEntry()) {
+      if (historyNavPending.current) return;
+      historyNavPending.current = true;
+      window.history.back();
+      return;
+    }
+    stripAppParam();
+  }, []);
+  const open = (id: AppId, source: "user" | "history" = "user") => {
     const isGallery = id === "atlas" || !!appById[id].collection;
     const width =
       id === "music"
@@ -465,10 +519,24 @@ export default function Desktop({
     });
     launchedAppRef.current = id;
     changeSurface(null);
+    if (source === "user") {
+      const current = new URL(window.location.href).searchParams.get("app");
+      if (current !== id) {
+        // A newer visit supersedes a back() that has not fired yet.
+        historyNavPending.current = false;
+        const previous = window.history.state;
+        const state =
+          previous && typeof previous === "object"
+            ? { ...previous, desktopApp: true }
+            : { desktopApp: true };
+        window.history.pushState(state, "", hrefWithApp(id));
+      }
+    }
     window.requestAnimationFrame(() => {
       if (!surfaceRef.current) focusWindow(id);
     });
   };
+  openRef.current = open;
   const restoreDesktopFocus = useCallback((id: AppId) => {
     window.requestAnimationFrame(() =>
       shortcutsRef.current
@@ -476,15 +544,19 @@ export default function Desktop({
         ?.focus({ preventScroll: true }),
     );
   }, []);
+  restoreDesktopFocusRef.current = restoreDesktopFocus;
   const close = (id: AppId) => {
     dispatch({ type: "close", id });
     restoreDesktopFocus(id);
+    retreatAppHistory();
   };
   const dismiss = () => {
-    if (active) {
-      dispatch({ type: "minimize", id: active.id });
-      restoreDesktopFocus(active.id);
-    }
+    if (!active) return;
+    dispatch({ type: "minimize", id: active.id });
+    restoreDesktopFocus(active.id);
+    // Replace the current entry. history.back() would surface the previous
+    // app, and a later focus event can show that window again.
+    stripAppParam();
   };
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
@@ -526,11 +598,12 @@ export default function Desktop({
         event.preventDefault();
         dispatch({ type: "minimize", id: active.id });
         restoreDesktopFocus(active.id);
+        stripAppParam();
       }
     };
     window.addEventListener("keydown", keyboard);
     return () => window.removeEventListener("keydown", keyboard);
-  }, [active?.id, hideSurface, showSurface, restoreDesktopFocus]);
+  }, [active?.id, hideSurface, showSurface, restoreDesktopFocus, retreatAppHistory]);
   useEffect(() => {
     // Menubar panels are background chrome on a mobile fullscreen app. A
     // breakpoint change must not leave one focused underneath that app.
@@ -591,11 +664,31 @@ export default function Desktop({
   }, []);
   useEffect(() => {
     if (applications.some((app) => app.id === initialApp))
-      open(initialApp as AppId);
+      open(initialApp as AppId, "history");
     // Open on app-query changes, not on resize; collection-query changes are
     // independently reflected by atlasCollection without reopening the window.
+    // Deep links already own the URL, so this path must not push another entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialApp]);
+  useEffect(() => {
+    const onPopState = () => {
+      const fromUi = historyNavPending.current;
+      historyNavPending.current = false;
+      const next = readAppParam();
+      const current = activeIdRef.current;
+      if (fromUi) {
+        if (next && next !== current) openRef.current(next, "history");
+        return;
+      }
+      if (current && current !== next) {
+        dispatch({ type: "close", id: current });
+        restoreDesktopFocusRef.current(current);
+      }
+      if (next && next !== current) openRef.current(next, "history");
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   useEffect(() => {
     document.title = active
       ? `${appById[active.id].name} · Haonan Li`
@@ -965,7 +1058,9 @@ export default function Desktop({
                   zIndex: 20 + index,
                   display: minimized ? "none" : undefined,
                 }}
-                onMouseDown={() => dispatch({ type: "focus", id })}
+                onMouseDown={() => {
+                  if (!minimized) dispatch({ type: "focus", id });
+                }}
                 onDragStop={(_, data) =>
                   dispatch({
                     type: "geometry",
@@ -992,8 +1087,15 @@ export default function Desktop({
                     mobileAppOpen && active?.id === id ? true : undefined
                   }
                   aria-label={`${appById[id].name} 窗口`}
-                  tabIndex={-1}
-                  onFocusCapture={() => {
+                  tabIndex={minimized ? undefined : -1}
+                  {...{ inert: minimized ? "" : undefined }}
+                  onFocusCapture={(event) => {
+                    if (minimized) {
+                      const focused = document.activeElement;
+                      if (focused instanceof HTMLElement && event.currentTarget.contains(focused))
+                        focused.blur();
+                      return;
+                    }
                     if (active?.id !== id) dispatch({ type: "focus", id });
                   }}
                 >
@@ -1173,7 +1275,7 @@ export default function Desktop({
                         setSettings({ ...settings, wallpaper: key })
                       }
                     >
-                      <img src={wallpaperMap[key]} alt="" />
+                      <img src={wallpaperMap[key]} alt="" loading="lazy" decoding="async" />
                       {settings.wallpaper === key && <Check size={16} />}
                     </button>
                   ))}
@@ -1345,7 +1447,7 @@ export default function Desktop({
                         aria-hidden="true"
                       />
                     ) : (
-                      <img src={app.icon} alt="" />
+                      <img src={app.icon} alt="" loading="lazy" decoding="async" />
                     )}
                     <strong>{app.name}</strong>
                     <span>

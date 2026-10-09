@@ -102,7 +102,7 @@ export function StudioContact() {
       </header>
       <div className="studio-contact-card">
         <div className="contact-identity">
-          <img src={avatar} alt="Haonan 的头像" />
+          <img src={avatar} alt="Haonan 的头像" loading="lazy" decoding="async" />
           <strong>Haonan Li</strong>
           <span>Shanghai, China</span>
           <div>
@@ -116,7 +116,7 @@ export function StudioContact() {
         </div>
         <div className="contact-wechat">
           <span>WECHAT / 微信</span>
-          <img src={qr} alt="Haonan 的微信二维码" />
+          <img src={qr} alt="Haonan 的微信二维码" loading="lazy" decoding="async" />
           <strong className="selectable">Lntano.</strong>
           <button onClick={copy}>
             {copied ? <Check size={16} /> : <Copy size={16} />}

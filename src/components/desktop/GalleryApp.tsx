@@ -14,7 +14,7 @@ import "@/styles/collections.css";
 const icons = { daily: BookImage, photos: Aperture, artists: Music2, films: Film, games: Gamepad2, food: Utensils };
 type Category = CollectionId | "all" | "favorites";
 
-export function CollectionImage({ item, lazy = false }: { item: MediaItem; lazy?: boolean }) {
+export function CollectionImage({ item, lazy = true }: { item: MediaItem; lazy?: boolean }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   return <>

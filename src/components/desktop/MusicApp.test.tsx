@@ -16,6 +16,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("music playback controls", () => {
+  it("does not attach the iTunes preview until the user plays", async () => {
+    const { container } = render(<MusicApp />);
+    const audio = container.querySelector("audio")!;
+    expect(audio).not.toHaveAttribute("src");
+    expect(audio).toHaveAttribute("preload", "none");
+    expect(HTMLMediaElement.prototype.load).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "播放音乐" }));
+    await act(async () => {});
+    expect(audio).toHaveAttribute("src", music.tracks[0].previewUrl);
+    expect(HTMLMediaElement.prototype.load).toHaveBeenCalled();
+  });
   it("starts silent and changing sources does not start playback", async () => {
     const { container } = render(<MusicApp />);
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
