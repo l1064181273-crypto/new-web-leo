@@ -1041,21 +1041,25 @@ describe("desktop window history", () => {
     expect(document.title).toBe("Cinema · Haonan Li");
   });
 
-  it("goes back when the window is closed or dismissed, and replaces a deep link instead of leaving the site", async () => {
+  it("strips the app query when a window is dismissed, and goes back only when it is closed", async () => {
     const view = await startDesktop();
     fireEvent.click(shortcut("notes"));
     await settle();
+    const lengthBeforeDismiss = window.history.length;
     fireEvent.keyDown(screen.getByLabelText("Test note body"), { key: "Escape" });
     await settle();
     expect(screen.queryByRole("dialog", { name: "Field Notes 窗口" })).not.toBeInTheDocument();
     expect(appParam()).toBeNull();
+    expect(window.history.length).toBe(lengthBeforeDismiss);
     expect(document.title).toBe("Haonan Li · Personal Desktop");
 
     window.history.forward();
     await settle();
-    expect(appParam()).toBe("notes");
-    expect(screen.getByRole("dialog", { name: "Field Notes 窗口" })).toBeVisible();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Field Notes 窗口" })).not.toBeInTheDocument();
 
+    fireEvent.click(shortcut("notes"));
+    await settle();
     fireEvent.click(screen.getByRole("button", { name: "关闭窗口" }));
     await settle();
     expect(appParam()).toBeNull();
@@ -1090,20 +1094,28 @@ describe("desktop window history", () => {
     expect(appParam()).toBe("projects");
     expect(window.location.search).not.toContain("app=profile");
 
+    const length = window.history.length;
     fireEvent.click(screen.getByRole("button", { name: "回到桌面" }));
     await settle();
     expect(appParam()).toBeNull();
+    expect(window.history.length).toBe(length);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(document.title).toBe("Haonan Li · Personal Desktop");
+    document.querySelector<HTMLElement>(".app-profile")?.focus();
+    await settle();
+    expect(screen.queryByRole("dialog", { name: "Profile 窗口" })).not.toBeInTheDocument();
 
     window.history.back();
     await settle();
-    expect(appParam()).toBeNull();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(appParam()).toBe("profile");
+    expect(screen.getByRole("dialog", { name: "Profile 窗口" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Projects 窗口" })).not.toBeInTheDocument();
 
     window.history.forward();
     await settle();
     expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
     fireEvent.click(shortcut("profile"));
     await settle();
     fireEvent.click(screen.getByRole("button", { name: "搜索应用" }));
@@ -1118,15 +1130,6 @@ describe("desktop window history", () => {
     expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Profile 窗口" })).not.toBeInTheDocument();
 
-    window.history.forward();
-    await settle();
-    expect(appParam()).toBe("cinema");
-    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "Cinema 窗口" }), { key: "Escape" });
-    await settle();
-    expect(appParam()).toBeNull();
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
     fireEvent.click(shortcut("profile"));
     await settle();
     fireEvent.click(shortcut("projects"));
@@ -1138,7 +1141,7 @@ describe("desktop window history", () => {
     expect(screen.queryByRole("dialog", { name: "Projects 窗口" })).not.toBeInTheDocument();
   });
 
-  it("returns to the desktop on the mobile home control and reopens that app with Forward", async () => {
+  it("returns to the desktop on the mobile home control without leaving the site", async () => {
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       writable: true,
@@ -1148,14 +1151,20 @@ describe("desktop window history", () => {
     fireEvent.click(shortcut("cinema"));
     await settle();
     expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toHaveAttribute("aria-modal", "true");
+    const length = window.history.length;
     fireEvent.click(screen.getByRole("button", { name: "回到桌面" }));
     await settle();
     expect(appParam()).toBeNull();
+    expect(window.history.length).toBe(length);
     expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
     expect(document.querySelector(".desktop-shortcuts")).not.toHaveAttribute("inert");
     window.history.forward();
     await settle();
-    expect(appParam()).toBe("cinema");
-    expect(screen.getByRole("dialog", { name: "Cinema 窗口" })).toBeVisible();
+    expect(appParam()).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Cinema 窗口" })).not.toBeInTheDocument();
+    window.history.back();
+    await settle();
+    expect(appParam()).toBeNull();
+    expect(document.querySelector(".leo-desktop")).toBeTruthy();
   });
 });

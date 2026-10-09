@@ -46,38 +46,42 @@ test("back closes the topmost window and forward reopens it", async ({ page }) =
   await expect(page).toHaveTitle("Haonan Li · Personal Desktop");
 
   await page.goForward();
-  await expect(page.getByRole("dialog", { name: "Profile 窗口", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/[?&]app=cinema(?:&|$)/);
+  await expect(page.getByRole("dialog", { name: "Cinema 窗口", exact: true })).toBeVisible();
 });
 
-test("going to the desktop does not restore the app opened underneath", async ({ page }) => {
+test("going to the desktop never restores the previous app", async ({ page }) => {
   await ready(page);
-  const leaveDesktop = async (action: "home" | "escape" | "minimize") => {
-    await openApp(page, "Profile");
-    await page.getByRole("button", { name: /动手做点什么/ }).click();
-    await expect(page).toHaveURL(/[?&]app=projects(?:&|$)/);
-    await expect(page.getByRole("dialog", { name: "Projects 窗口", exact: true })).toBeVisible();
-    if (action === "home") {
-      await page.getByRole("button", { name: "回到桌面", exact: true }).click();
-    } else if (action === "escape") {
-      await page.keyboard.press("Escape");
-    } else {
-      await page.getByRole("button", { name: "收起窗口", exact: true }).click();
+  const actions = ["home", "escape", "minimize"] as const;
+  for (let round = 0; round < 8; round += 1) {
+    for (const action of actions) {
+      await openApp(page, "Profile");
+      await page.getByRole("button", { name: /动手做点什么/ }).click();
+      await expect(page).toHaveURL(/[?&]app=projects(?:&|$)/);
+      await expect(page.getByRole("dialog", { name: "Projects 窗口", exact: true })).toBeVisible();
+      const length = await page.evaluate(() => history.length);
+      if (action === "home") {
+        await page.getByRole("button", { name: "回到桌面", exact: true }).click();
+      } else if (action === "escape") {
+        await page.keyboard.press("Escape");
+      } else {
+        await page.getByRole("button", { name: "收起窗口", exact: true }).click();
+      }
+      await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
+      await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+      await expect(page.locator(".leo-desktop")).toBeVisible();
+      await expect(page).toHaveTitle("Haonan Li · Personal Desktop");
+      expect(await page.evaluate(() => history.length)).toBe(length);
+      await page.waitForTimeout(200);
+      await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+      await expect(page.getByRole("dialog", { name: "Profile 窗口", exact: true })).toBeHidden();
     }
-    await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
-    await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
-    await expect(page.locator(".leo-desktop")).toBeVisible();
-    await expect(page).toHaveTitle("Haonan Li · Personal Desktop");
-  };
+  }
 
-  await leaveDesktop("home");
   await page.goBack();
-  await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
-  await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+  await expect(page).toHaveURL(/[?&]app=profile(?:&|$)/);
+  await expect(page.getByRole("dialog", { name: "Profile 窗口", exact: true })).toBeVisible();
   await expect(page.locator(".leo-desktop")).toBeVisible();
-  await page.goForward();
-
-  await leaveDesktop("escape");
-  await leaveDesktop("minimize");
 });
 
 test("a deep link stays on the site when its window is closed and keeps other query params", async ({ page }) => {
@@ -97,11 +101,14 @@ test("mobile home and back gesture leave the app without leaving the site", asyn
   test.skip(!isMobile, "Desktop uses the same history path; this checks the fullscreen mobile controls.");
   await ready(page);
   await openApp(page, "Cinema");
+  const length = await page.evaluate(() => history.length);
   await page.getByRole("button", { name: "回到桌面", exact: true }).click();
   await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
   await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
+  expect(await page.evaluate(() => history.length)).toBe(length);
   await page.goForward();
-  await expect(page.getByRole("dialog", { name: "Cinema 窗口", exact: true })).toBeVisible();
+  await expect(page).toHaveURL((url) => !url.searchParams.has("app"));
+  await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
   await page.goBack();
   await expect(page.locator(".desktop-window:visible")).toHaveCount(0);
   await expect(page.locator(".leo-desktop")).toBeVisible();
